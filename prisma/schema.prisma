@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------
+// ENUMS (Listas de valores fixos)
+// --------------------------------------------------
+enum Role {
+  ADMIN
+  PROFESSOR
+  SECRETARIA
+  COZINHA
+  SISTEMA_IA
+}
+
+enum StatusPresenca {
+  PRESENTE
+  AUSENTE
+  JUSTIFICADO
+}
+
+// --------------------------------------------------
+// MODELOS (Tabelas)
+// --------------------------------------------------
+
+model Usuario {
+  id           String   @id @default(uuid())
+  nome         String
+  email        String   @unique
+  senha        String   // Onde salvaremos a senha hasheada com bcrypt
+  role         Role     @default(PROFESSOR)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+model Aluno {
+  id              String       @id @default(uuid())
+  nome            String
+  matricula       String       @unique
+  fotoTreinamento String?      // Caminho/URL da foto base para a IA treinar o rosto
+  faceId          String?      // ID ou assinatura biométrica retornada pelo Python
+  criadoEm        DateTime     @default(now())
+  atualizadoEm    DateTime     @updatedAt
+  
+  turmas          TurmaAluno[]
+  presencas       Presenca[]
+
+  @@map("alunos") // Nome da tabela no banco
+}
+
+model Turma {
+  id           String       @id @default(uuid())
+  nome         String
+  anoLetivo    Int
+  criadoEm     DateTime     @default(now())
+  
+  alunos       TurmaAluno[]
+  presencas    Presenca[]
+
+  @@map("turmas")
+}
+
+// Tabela pivô para relação N:N (Muitos alunos podem estar em muitas turmas)
+model TurmaAluno {
+  alunoId      String
+  turmaId      String
+  
+  aluno        Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@id([alunoId, turmaId])
+  @@map("turmas_alunos")
+}
+
+model Disciplina {
+  id           String     @id @default(uuid())
+  nome         String
+  codigo       String     @unique
+  
+  presencas    Presenca[]
+
+  @@map("disciplinas")
+}
+
+model Presenca {
+  id           String         @id @default(uuid())
+  alunoId      String
+  turmaId      String
+  disciplinaId String?        // Opcional, caso a chamada seja por dia e não por aula específica
+  status       StatusPresenca @default(PRESENTE)
+  dataHora     DateTime       @default(now()) // Horário exato que a IA bateu o ponto
+  
+  aluno        Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma        Turma          @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina?    @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
+
+  @@index([alunoId, dataHora]) // Índice para agilizar os relatórios da secretaria/cozinha
+  @@map("presencas")
+}
