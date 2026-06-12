@@ -10,6 +10,9 @@ const disciplinaRoutes = require('./modules/disciplinas/disciplina.routes');
 const presencaRoutes = require('./modules/presencas/presenca.routes');
 const iaRoutes = require('./modules/ia/ia.routes');
 const relatorioRoutes = require('./modules/relatorios/relatorio.routes');
+const appConfig = require('./config/app.config');
+const requestLogger = require('./middlewares/requestLogger');
+const rateLimiter = require('./middlewares/rateLimiter');
 
 const app = express();
 
@@ -17,8 +20,10 @@ const app = express();
 // MIDDLEWARES GLOBAIS
 // ==========================================
 app.use(helmet()); // Adiciona headers de segurança HTTP
-app.use(cors()); // Permite requisições do frontend (React/Flutter)
+app.use(cors(appConfig.corsOptions)); // Permite requisições do frontend (React/Flutter)
 app.use(express.json()); // Transforma o corpo das requisições (body) em JSON
+app.use(requestLogger); // Registra as requisições
+app.use(rateLimiter); // Aplica o rate limiting
 
 // ==========================================
 // HEALTH CHECK
@@ -35,13 +40,16 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 // ROTAS DA APLICAÇÃO
 // ==========================================
-app.use('/api/v1/auth', authRoutes); // Rota de login ativada!
-app.use('/api/v1/alunos', alunoRoutes);
-app.use('/api/v1/turmas', turmaRoutes);
-app.use('/api/v1/disciplinas', disciplinaRoutes);
-app.use('/api/v1/presencas', presencaRoutes);
-app.use('/api/v1/ia', iaRoutes);
-app.use('/api/v1/relatorios', relatorioRoutes);
+// ==========================================
+// ROTAS DA APLICAÇÃO
+// ==========================================
+app.use(`${appConfig.apiPrefix}/auth`, authRoutes);
+app.use(`${appConfig.apiPrefix}/alunos`, alunoRoutes);
+app.use(`${appConfig.apiPrefix}/turmas`, turmaRoutes);
+app.use(`${appConfig.apiPrefix}/disciplinas`, disciplinaRoutes);
+app.use(`${appConfig.apiPrefix}/presencas`, presencaRoutes);
+app.use(`${appConfig.apiPrefix}/ia`, iaRoutes);
+app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);
 // ==========================================
 // TRATAMENTO DE ERROS E ROTAS INEXISTENTES
 // ==========================================
