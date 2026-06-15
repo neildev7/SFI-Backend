@@ -1,45 +1,51 @@
 const alunoService = require('../alunos/aluno.service');
 const presencaService = require('../presencas/presenca.service');
-const presencaRepository = require('../presencas/presenca.repository'); 
+const presencaRepository = require('../presencas/presenca.repository');
+const horarioService = require('../horarios/horario.service');
 const AppError = require('../../utils/AppError');
 
-// Constante sênior: Linha de corte de 85% de assertividade da face
 const THRESHOLD_CONFIANCA_IA = 0.85;
 
 class IaService {
   async processarReconhecimento(data) {
-    const { alunoId, turmaId, disciplinaId, faceScore } = data;
+    const { alunoId, turmaId, faceScore } = data;
 
-    // 1. Confirma se o aluno realmente existe e está ativo
+    // 1. Confirmações iniciais
     const aluno = await alunoService.buscarAlunoPorId(alunoId);
+    if (faceScore !== undefined && faceScore !== null && faceScore < THRESHOLD_CONFIANCA_IA) {
+      throw new AppError(`Reconhecimento rejeitado. Baixa confiança (${(faceScore * 100).toFixed(1)}%).`, 422);
+    }
+    const disciplinaIdDetectada = await horarioService.validarEObterDisciplinaAtual(turmaId);
 
-    // 2. NOVA VALIDAÇÃO: Se o Pietro mandar o score, checa se passou na linha de corte
-    if (faceScore !== undefined && faceScore !== null) {
-      if (faceScore < THRESHOLD_CONFIANCA_IA) {
-        // Lança um erro 422 (Entidade Não Processável) para o script Python saber que foi rejeitado por baixa confiança
-        throw new AppError(
-          `Reconhecimento rejeitado. Confiança de ${(faceScore * 100).toFixed(1)}% está abaixo do mínimo exigido (${THRESHOLD_CONFIANCA_IA * 100}%).`, 
-          422
-        );
+    // 2. A NOVA REGRA DE ENTRADA E SAÍDA
+    const presencaHoje = await presencaRepository.buscarPresencaCompletaDeHoje(alunoId, turmaId);
+
+    // Se o aluno JÁ BATEU O PONTO DE ENTRADA hoje
+    if (presencaHoje) {
+      // Verifica se ele AINDA NÃO BATEU A SAÍDA
+      if (!presencaHoje.dataHoraSaida) {
+        // Registra a saída do garoto!
+        const saidaRegistrada = await presencaRepository.registrarSaida(presencaHoje.id);
+        return {
+          aluno: aluno.nome,
+          status: 'SAIDA_REGISTRADA',
+          presenca: saidaRegistrada
+        };
+      } else {
+        // Se já tem entrada e saída, apenas ignora para não floodar o banco
+        return {
+          aluno: aluno.nome,
+          status: 'IGNORADO',
+          mensagem: 'O ciclo de entrada e saída deste aluno já foi concluído hoje.'
+        };
       }
     }
 
-    // 3. REGRA DE DEDUPLICAÇÃO: O aluno já bateu o ponto hoje?
-    const jaRegistrado = await presencaRepository.verificarPresencaExistenteHoje(alunoId, turmaId);
-
-    if (jaRegistrado) {
-      return {
-        aluno: aluno.nome,
-        status: 'IGNORADO',
-        mensagem: 'O aluno já possui presença registrada para esta turma no dia de hoje.'
-      };
-    }
-
-    // 4. Se passou em tudo, registra a presença forçando a origem FACIAL
+    // 3. Se não caiu em nenhum 'if' acima, é porque é a PRIMEIRA VEZ no dia. Registra a ENTRADA.
     const novaPresenca = await presencaService.registrarPresencaManual({
       alunoId,
       turmaId,
-      disciplinaId,
+      disciplinaId: disciplinaIdDetectada,
       status: 'PRESENTE',
       origem: 'FACIAL',
       faceScore: faceScore || null
@@ -47,7 +53,7 @@ class IaService {
 
     return {
       aluno: aluno.nome,
-      status: 'REGISTRADO',
+      status: 'ENTRADA_REGISTRADA',
       presenca: novaPresenca
     };
   }

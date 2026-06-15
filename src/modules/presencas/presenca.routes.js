@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const presencaController = require('./presenca.controller');
+const justificativaController = require('../justificativas/justificativa.controller'); // <-- FALTAVA ESSA IMPORTAÇÃO!
 const authenticate = require('../../middlewares/authenticate');
 const authorize = require('../../middlewares/authorize');
 const validate = require('../../middlewares/validate');
@@ -17,10 +18,9 @@ router.get('/turma/:id', presencaController.getByTurma);
 
 // Validador de presença manual injetado
 router.post(
-  '/', 
-  authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.PROFESSOR]), 
-  validate(registrarPresencaSchema), 
-  presencaController.create
+  '/:presencaId/justificar', 
+  authorize([ROLES.ADMIN, ROLES.SECRETARIA]), 
+  justificativaController.create
 );
 
 module.exports = router;

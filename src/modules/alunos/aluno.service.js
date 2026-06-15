@@ -1,38 +1,46 @@
 const alunoRepository = require('./aluno.repository');
 const presencaRepository = require('../presencas/presenca.repository');
+const alertaService = require('../alertas/alerta.service'); // <-- O GATILHO DO ALERTA AQUI
+const auditService = require('../auditoria/audit.service'); // <-- A CAIXA-PRETA AQUI
 const AppError = require('../../utils/AppError');
 
 class AlunoService {
-  async createAluno(data) {
-    // Regra: Não podem existir dois alunos com a mesma matrícula
+  // Recebe o usuarioLogadoId para a auditoria
+  async createAluno(data, usuarioLogadoId) {
     const alunoExistente = await alunoRepository.findByMatricula(data.matricula);
     if (alunoExistente) {
       throw new AppError('Já existe um aluno cadastrado com esta matrícula.', 400);
     }
 
-    return await alunoRepository.create(data);
+    const novoAluno = await alunoRepository.create(data);
+
+    // Auditoria
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'CREATE',
+      entidade: 'Aluno',
+      entidadeId: novoAluno.id,
+      dadosNovos: novoAluno
+    });
+
+    return novoAluno;
   }
 
   async listarAlunos(pagina, limite) {
     return await alunoRepository.findAll(pagina, limite);
   }
 
- async buscarAlunoPorId(id) {
+  async buscarAlunoPorId(id) {
     const aluno = await alunoRepository.findById(id);
-    
-    // Se o aluno não existir OU estiver inativo (deletado), dá erro.
     if (!aluno || !aluno.ativo) {
       throw new AppError('Aluno não encontrado ou inativo no sistema.', 404);
     }
-    
     return aluno;
   }
 
-  async atualizarAluno(id, data) {
-    // Verifica se o aluno existe antes de atualizar
-    await this.buscarAlunoPorId(id);
+  async atualizarAluno(id, data, usuarioLogadoId) {
+    const alunoAntigo = await this.buscarAlunoPorId(id);
 
-    // Se estiver tentando mudar a matrícula, verifica se a nova já existe
     if (data.matricula) {
       const alunoExistente = await alunoRepository.findByMatricula(data.matricula);
       if (alunoExistente && alunoExistente.id !== id) {
@@ -40,27 +48,45 @@ class AlunoService {
       }
     }
 
-    return await alunoRepository.update(id, data);
+    const alunoAtualizado = await alunoRepository.update(id, data);
+
+    // Auditoria
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'UPDATE',
+      entidade: 'Aluno',
+      entidadeId: id,
+      dadosAntigos: alunoAntigo,
+      dadosNovos: alunoAtualizado
+    });
+
+    return alunoAtualizado;
   }
 
-  async deletarAluno(id) {
-    await this.buscarAlunoPorId(id);
-    return await alunoRepository.delete(id);
+  async deletarAluno(id, usuarioLogadoId) {
+    const alunoAntigo = await this.buscarAlunoPorId(id);
+    const alunoDeletado = await alunoRepository.delete(id);
+
+    // Auditoria
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'DELETE',
+      entidade: 'Aluno',
+      entidadeId: id,
+      dadosAntigos: alunoAntigo
+    });
+
+    return alunoDeletado;
   }
 
-  // Agora aceita dataInicio e dataFim
   async calcularFrequenciaPercentual(id, dataInicio, dataFim) {
-    // 1. Garante que o aluno existe
     await this.buscarAlunoPorId(id);
-
-    // 2. Busca a contagem agrupada no banco já com o recorte de tempo
     const contagem = await presencaRepository.countByStatusAndAluno(id, dataInicio, dataFim);
 
     let presentes = 0;
     let ausentes = 0;
     let justificados = 0;
 
-    // 3. Separa os valores
     contagem.forEach(item => {
       if (item.status === 'PRESENTE') presentes = item._count._all;
       if (item.status === 'AUSENTE') ausentes = item._count._all;
@@ -70,12 +96,21 @@ class AlunoService {
     const totalRegistros = presentes + ausentes + justificados;
     let porcentagem = 0;
 
-    // 4. Calcula a porcentagem
     if (totalRegistros > 0) {
       porcentagem = ((presentes + justificados) / totalRegistros) * 100;
     }
 
-    // 5. Devolve o pacote super completo para o frontend
+    const frequenciaFinal = Number(porcentagem.toFixed(2));
+
+    // -------------------------------------------------------------
+    // O GATILHO DO ALERTA (Roda em background)
+    // -------------------------------------------------------------
+    if (totalRegistros > 5) { // Só dispara depois de 5 aulas registradas
+      // Como a consulta é geral (sem turma específica), passamos 'GERAL' no lugar do turmaId
+      alertaService.checarEGerarAlerta(id, 'GERAL', frequenciaFinal)
+        .catch(err => console.error("Erro ao gerar alerta de evasão:", err.message));
+    }
+
     return {
       alunoId: id,
       periodo: {
@@ -83,12 +118,8 @@ class AlunoService {
         fim: dataFim || 'Todo o histórico'
       },
       totalRegistros,
-      detalhes: {
-        presentes,
-        ausentes,
-        justificados
-      },
-      frequenciaPercentual: Number(porcentagem.toFixed(2))
+      detalhes: { presentes, ausentes, justificados },
+      frequenciaPercentual: frequenciaFinal
     };
   }
 }

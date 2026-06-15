@@ -110,6 +110,28 @@ class PresencaRepository {
 
     return !!presenca; // Retorna true se encontrou, false se não encontrou
   }
+
+  // Busca o registro completo de hoje do aluno na turma
+  async buscarPresencaCompletaDeHoje(alunoId, turmaId) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0); // Zera as horas para pegar do início do dia
+
+    return await prisma.presenca.findFirst({
+      where: {
+        alunoId,
+        turmaId,
+        dataHora: { gte: hoje }
+      }
+    });
+  }
+
+  // Atualiza apenas o campo de saída
+  async registrarSaida(presencaId) {
+    return await prisma.presenca.update({
+      where: { id: presencaId },
+      data: { dataHoraSaida: new Date() }
+    });
+  }
 }
 
 module.exports = new PresencaRepository();

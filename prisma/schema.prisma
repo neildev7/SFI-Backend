@@ -73,6 +73,20 @@ model Usuario {
   @@map("usuarios")
 }
 
+model Justificativa {
+  id         String   @id @default(uuid())
+  presencaId String   @unique @map("presenca_id") // Relação 1:1
+  motivo     String   // Ex: "Atestado Médico - Virose"
+  anexoUrl   String?  @map("anexo_url") // Caso o Miguel no Flutter mande a foto do atestado pro S3/Firebase
+  aprovadoPor String? @map("aprovado_por") // Qual usuário da secretaria aprovou?
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  // A relação de volta
+  presenca   Presenca @relation(fields: [presencaId], references: [id], onDelete: Cascade)
+
+  @@map("justificativas")
+}
+
 model Aluno {
   id              String       @id @default(uuid())
   nome            String
@@ -82,7 +96,7 @@ model Aluno {
   ativo           Boolean      @default(true)
   criadoEm        DateTime     @default(now()) @map("criado_em")
   atualizadoEm    DateTime     @updatedAt @map("atualizado_em")
-  
+  alertas Alerta[]
   turmas          TurmaAluno[]
   presencas       Presenca[]
 
@@ -131,7 +145,7 @@ model Turma {
   alunos       TurmaAluno[]
   presencas    Presenca[]
   horarios     Horario[]    // <--- FALTAVA ESSA LINHA
-
+  alertas Alerta[]
   @@map("turmas")
 }
 
@@ -166,16 +180,31 @@ model Presenca {
   disciplinaId String?        @map("disciplina_id")
   status       StatusPresenca @default(PRESENTE)
   
-  // NOVOS CAMPOS AQUI
   origem       OrigemPresenca @default(MANUAL)
   faceScore    Float?         @map("face_score")
   
   dataHora     DateTime       @default(now()) @map("data_hora")
+  dataHoraSaida DateTime?     @map("data_hora_saida") // <--- O NOVO CAMPO AQUI!
   
   aluno        Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   turma        Turma          @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   disciplina   Disciplina?    @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
+  justificativa Justificativa?
 
   @@index([alunoId, dataHora]) 
   @@map("presencas")
+}
+
+model Alerta {
+  id        String   @id @default(uuid())
+  alunoId   String   @map("aluno_id")
+  turmaId   String   @map("turma_id")
+  mensagem  String
+  resolvido Boolean  @default(false)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  aluno     Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma     Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@map("alertas")
 }
