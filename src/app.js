@@ -40,16 +40,14 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 // ROTAS DA APLICAÇÃO
 // ==========================================
-// ==========================================
-// ROTAS DA APLICAÇÃO
-// ==========================================
+
 app.use(`${appConfig.apiPrefix}/auth`, authRoutes);
 app.use(`${appConfig.apiPrefix}/alunos`, alunoRoutes);
 app.use(`${appConfig.apiPrefix}/turmas`, turmaRoutes);
 app.use(`${appConfig.apiPrefix}/disciplinas`, disciplinaRoutes);
 app.use(`${appConfig.apiPrefix}/presencas`, presencaRoutes);
 app.use(`${appConfig.apiPrefix}/ia`, iaRoutes);
-app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);0
+app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);
 // ==========================================
 // TRATAMENTO DE ERROS E ROTAS INEXISTENTES
 // ==========================================

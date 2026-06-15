@@ -27,6 +27,35 @@ enum StatusPresenca {
   JUSTIFICADO
 }
 
+// NOVO: Enum para rastrear a origem do registro
+enum OrigemPresenca {
+  FACIAL
+  MANUAL
+}
+
+enum Turno {
+  MANHA
+  TARDE
+  NOITE
+  INTEGRAL
+}
+
+enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+  SABADO
+}
+
+enum AcaoAudit {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+}
+
 // --------------------------------------------------
 // MODELOS (Tabelas)
 // --------------------------------------------------
@@ -40,7 +69,7 @@ model Usuario {
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
+  auditLogs    AuditLog[]
   @@map("usuarios")
 }
 
@@ -60,15 +89,48 @@ model Aluno {
   @@map("alunos")
 }
 
+model AuditLog {
+  id           String    @id @default(uuid())
+  usuarioId    String?   @map("usuario_id") // Pode ser nulo se a ação for automática (ex: IA)
+  acao         AcaoAudit
+  entidade     String    // Qual tabela foi mexida? Ex: "Aluno", "Presenca"
+  entidadeId   String?   @map("entidade_id") // Qual o ID do registro alterado?
+  dadosAntigos Json?     @map("dados_antigos") // Como era antes (formato JSON)
+  dadosNovos   Json?     @map("dados_novos")   // Como ficou depois (formato JSON)
+  ip           String?   // Rastreio de onde veio a requisição
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+
+  usuario      Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model Horario {
+  id           String     @id @default(uuid())
+  turmaId      String     @map("turma_id")
+  disciplinaId String     @map("disciplina_id")
+  diaSemana    DiaSemana  @map("dia_semana")
+  horaInicio   String     @map("hora_inicio") // Vamos usar String no formato "07:30" para facilitar a comparação no Node
+  horaFim      String     @map("hora_fim")    // Formato "11:30"
+  ativo        Boolean    @default(true)
+
+  turma        Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@map("horarios")
+}
+
 model Turma {
   id           String       @id @default(uuid())
   nome         String
   anoLetivo    Int          @map("ano_letivo")
+  turno        Turno        @default(MANHA)
   ativo        Boolean      @default(true)
   criadoEm     DateTime     @default(now()) @map("criado_em")
   
   alunos       TurmaAluno[]
   presencas    Presenca[]
+  horarios     Horario[]    // <--- FALTAVA ESSA LINHA
 
   @@map("turmas")
 }
@@ -92,6 +154,7 @@ model Disciplina {
   ativo        Boolean    @default(true)
   
   presencas    Presenca[]
+  horarios     Horario[]  // <--- FALTAVA ESSA LINHA
 
   @@map("disciplinas")
 }
@@ -101,8 +164,12 @@ model Presenca {
   alunoId      String         @map("aluno_id")
   turmaId      String         @map("turma_id")
   disciplinaId String?        @map("disciplina_id")
-  ativo        Boolean        @default(true)
   status       StatusPresenca @default(PRESENTE)
+  
+  // NOVOS CAMPOS AQUI
+  origem       OrigemPresenca @default(MANUAL)
+  faceScore    Float?         @map("face_score")
+  
   dataHora     DateTime       @default(now()) @map("data_hora")
   
   aluno        Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)

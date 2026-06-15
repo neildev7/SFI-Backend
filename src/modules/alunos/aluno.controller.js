@@ -37,7 +37,15 @@ class AlunoController {
 
   async getFrequencia(req, res, next) {
     try {
-      const estatisticas = await alunoService.calcularFrequenciaPercentual(req.params.id);
+      // Pega os parâmetros da URL usando req.query
+      const { dataInicio, dataFim } = req.query;
+      
+      const estatisticas = await alunoService.calcularFrequenciaPercentual(
+        req.params.id, 
+        dataInicio, 
+        dataFim
+      );
+      
       return res.status(200).json({ status: 'success', data: estatisticas });
     } catch (error) {
       next(error);

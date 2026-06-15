@@ -48,18 +48,19 @@ class AlunoService {
     return await alunoRepository.delete(id);
   }
 
-  async calcularFrequenciaPercentual(id) {
-    // 1. Garante que o aluno existe (nosso método já checa inclusive se está ativo)
+  // Agora aceita dataInicio e dataFim
+  async calcularFrequenciaPercentual(id, dataInicio, dataFim) {
+    // 1. Garante que o aluno existe
     await this.buscarAlunoPorId(id);
 
-    // 2. Busca a contagem agrupada no banco
-    const contagem = await presencaRepository.countByStatusAndAluno(id);
+    // 2. Busca a contagem agrupada no banco já com o recorte de tempo
+    const contagem = await presencaRepository.countByStatusAndAluno(id, dataInicio, dataFim);
 
     let presentes = 0;
     let ausentes = 0;
     let justificados = 0;
 
-    // 3. Separa os valores mapeados
+    // 3. Separa os valores
     contagem.forEach(item => {
       if (item.status === 'PRESENTE') presentes = item._count._all;
       if (item.status === 'AUSENTE') ausentes = item._count._all;
@@ -69,21 +70,25 @@ class AlunoService {
     const totalRegistros = presentes + ausentes + justificados;
     let porcentagem = 0;
 
-    // 4. Calcula a porcentagem de presença (Presenças + Faltas Justificadas)
+    // 4. Calcula a porcentagem
     if (totalRegistros > 0) {
       porcentagem = ((presentes + justificados) / totalRegistros) * 100;
     }
 
-    // 5. Devolve o pacote mastigado
+    // 5. Devolve o pacote super completo para o frontend
     return {
       alunoId: id,
+      periodo: {
+        inicio: dataInicio || 'Todo o histórico',
+        fim: dataFim || 'Todo o histórico'
+      },
       totalRegistros,
       detalhes: {
         presentes,
         ausentes,
         justificados
       },
-      frequenciaPercentual: Number(porcentagem.toFixed(2)) // Ex: 85.50
+      frequenciaPercentual: Number(porcentagem.toFixed(2))
     };
   }
 }

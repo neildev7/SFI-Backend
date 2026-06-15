@@ -21,8 +21,13 @@ class PresencaController {
 
   async getAll(req, res, next) {
     try {
-      const presencas = await presencaService.listarTodas();
-      return res.status(200).json({ status: 'success', data: presencas });
+      // Pega os parâmetros da query string (se não vierem, a API assume 1 e 10)
+      const pagina = req.query.page || 1;
+      const limite = req.query.limit || 10;
+
+      const resultado = await presencaService.listarTodas(pagina, limite);
+      
+      return res.status(200).json({ status: 'success', data: resultado });
     } catch (error) {
       next(error);
     }

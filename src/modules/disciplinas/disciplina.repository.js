@@ -5,11 +5,13 @@ class DisciplinaRepository {
     return await prisma.disciplina.create({ data });
   }
 
+  // CORRIGIDO: Busca apenas disciplinas ativas
   async findAll() {
-    return await prisma.aluno.findMany({
-      where: { ativo: true }
+    return await prisma.disciplina.findMany({
+      where: { ativo: true },
+      orderBy: { nome: 'asc' } // De brinde: já devolve em ordem alfabética pro Miguel!
     });
-  }''
+  }
 
   async findById(id) {
     return await prisma.disciplina.findUnique({
@@ -23,8 +25,16 @@ class DisciplinaRepository {
     });
   }
 
+  async update(id, data) {
+    return await prisma.disciplina.update({
+      where: { id },
+      data
+    });
+  }
+
+  // CORRIGIDO: Soft delete na tabela de disciplinas
   async delete(id) {
-    return await prisma.aluno.update({
+    return await prisma.disciplina.update({
       where: { id },
       data: { ativo: false }
     });

@@ -3,10 +3,15 @@ const iaService = require('./ia.service');
 class IaController {
   async registrarPresenca(req, res, next) {
     try {
-      // O Zod já garantiu que os IDs chegaram no formato correto (UUID)
-      const { alunoId, turmaId, disciplinaId } = req.body;
+      const { alunoId, turmaId, disciplinaId, faceScore } = req.body;
 
-      const resultado = await iaService.processarReconhecimento({ alunoId, turmaId, disciplinaId });
+      // Repassa o faceScore recebido do Python para o processamento
+      const resultado = await iaService.processarReconhecimento({ 
+        alunoId, 
+        turmaId, 
+        disciplinaId, 
+        faceScore 
+      });
 
       return res.status(201).json({ 
         status: 'success', 

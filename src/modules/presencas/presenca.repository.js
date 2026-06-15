@@ -9,12 +9,33 @@ class PresencaRepository {
     });
   }
 
-  async findAll() {
-    // CORRIGIDO: Voltou a ser prisma.presenca e com as relações certas
-    return await prisma.presenca.findMany({
-      include: { aluno: true, turma: true },
-      orderBy: { dataHora: 'desc' }
-    });
+  // Agora recebe página e limite, com valores padrão (1 e 10)
+  async findAll(pagina = 1, limite = 10) {
+    const skip = (pagina - 1) * limite;
+    const take = Number(limite);
+
+    // Faz a busca dos dados e a contagem total ao mesmo tempo
+    const [presencas, total] = await prisma.$transaction([
+      prisma.presenca.findMany({
+        skip,
+        take,
+        include: { aluno: true, turma: true },
+        orderBy: { dataHora: 'desc' }
+      }),
+      prisma.presenca.count()
+    ]);
+
+    const totalPaginas = Math.ceil(total / take);
+
+    return {
+      dados: presencas,
+      meta: {
+        total,
+        paginaAtual: Number(pagina),
+        totalPaginas,
+        itensPorPagina: take
+      }
+    };
   }
 
   async findByAlunoId(alunoId) {
@@ -51,10 +72,20 @@ class PresencaRepository {
   }
 
   // Novo método para o cálculo de frequência
-  async countByStatusAndAluno(alunoId) {
+  // Modificado para aceitar inicio e fim opcionais
+  async countByStatusAndAluno(alunoId, dataInicio, dataFim) {
+    const whereClause = { alunoId };
+
+    // Se o frontend mandou as datas, nós construímos o filtro dinamicamente
+    if (dataInicio || dataFim) {
+      whereClause.dataHora = {};
+      if (dataInicio) whereClause.dataHora.gte = new Date(dataInicio); // Maior ou igual ao início
+      if (dataFim) whereClause.dataHora.lte = new Date(dataFim);       // Menor ou igual ao fim
+    }
+
     return await prisma.presenca.groupBy({
       by: ['status'],
-      where: { alunoId },
+      where: whereClause,
       _count: {
         _all: true
       }

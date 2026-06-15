@@ -3,9 +3,11 @@ const turmaService = require('./turma.service');
 class TurmaController {
   async create(req, res, next) {
     try {
-      // Zod já validou o nome e o anoLetivo!
-      const { nome, anoLetivo } = req.body;
-      const novaTurma = await turmaService.createTurma({ nome, anoLetivo });
+      // Zod já validou o nome, anoLetivo e agora o turno!
+      const { nome, anoLetivo, turno } = req.body;
+      
+      const novaTurma = await turmaService.createTurma({ nome, anoLetivo, turno });
+      
       return res.status(201).json({ status: 'success', data: novaTurma });
     } catch (error) {
       next(error);
@@ -33,6 +35,17 @@ class TurmaController {
   async getAlunos(req, res, next) {
     try {
       const alunos = await turmaService.listarAlunosDaTurma(req.params.id);
+      return res.status(200).json({ status: 'success', data: alunos });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAlunosDaTurma(req, res, next) {
+    try {
+      // Pega o ID da turma que vem na URL
+      const alunos = await turmaService.listarAlunosDaTurma(req.params.id);
+      
       return res.status(200).json({ status: 'success', data: alunos });
     } catch (error) {
       next(error);
