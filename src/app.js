@@ -49,7 +49,7 @@ app.use(`${appConfig.apiPrefix}/turmas`, turmaRoutes);
 app.use(`${appConfig.apiPrefix}/disciplinas`, disciplinaRoutes);
 app.use(`${appConfig.apiPrefix}/presencas`, presencaRoutes);
 app.use(`${appConfig.apiPrefix}/ia`, iaRoutes);
-app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);
+app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);0
 // ==========================================
 // TRATAMENTO DE ERROS E ROTAS INEXISTENTES
 // ==========================================

@@ -3,15 +3,8 @@ const iaService = require('./ia.service');
 class IaController {
   async registrarPresenca(req, res, next) {
     try {
-      // O backend Python enviará no corpo (body) o ID do aluno que ele reconheceu na câmera
+      // O Zod já garantiu que os IDs chegaram no formato correto (UUID)
       const { alunoId, turmaId, disciplinaId } = req.body;
-
-      if (!alunoId || !turmaId) {
-        return res.status(400).json({ 
-          status: 'fail', 
-          message: 'alunoId e turmaId são obrigatórios para a IA registrar presença.' 
-        });
-      }
 
       const resultado = await iaService.processarReconhecimento({ alunoId, turmaId, disciplinaId });
 

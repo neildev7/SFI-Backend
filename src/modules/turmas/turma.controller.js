@@ -3,12 +3,8 @@ const turmaService = require('./turma.service');
 class TurmaController {
   async create(req, res, next) {
     try {
+      // Zod já validou o nome e o anoLetivo!
       const { nome, anoLetivo } = req.body;
-
-      if (!nome || !anoLetivo) {
-        return res.status(400).json({ status: 'fail', message: 'Nome e ano letivo são obrigatórios.' });
-      }
-
       const novaTurma = await turmaService.createTurma({ nome, anoLetivo });
       return res.status(201).json({ status: 'success', data: novaTurma });
     } catch (error) {

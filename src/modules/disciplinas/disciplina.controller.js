@@ -3,12 +3,8 @@ const disciplinaService = require('./disciplina.service');
 class DisciplinaController {
   async create(req, res, next) {
     try {
+      // Zod garantiu tudo e ainda converteu o código pra maiúsculo!
       const { nome, codigo } = req.body;
-
-      if (!nome || !codigo) {
-        return res.status(400).json({ status: 'fail', message: 'Nome e código são obrigatórios.' });
-      }
-
       const novaDisciplina = await disciplinaService.createDisciplina({ nome, codigo });
       return res.status(201).json({ status: 'success', data: novaDisciplina });
     } catch (error) {

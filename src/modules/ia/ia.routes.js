@@ -1,17 +1,16 @@
 const { Router } = require('express');
 const iaController = require('./ia.controller');
 const validateApiKey = require('../../middlewares/validateApiKey');
+const validate = require('../../middlewares/validate');
+const { registrarPresencaIaSchema } = require('../../validators/ia.validator');
 
 const router = Router();
 
-// ATENÇÃO: Aqui NÃO usamos o authenticate (JWT). 
-// Usamos a nossa Api Key para o Python conseguir bater nessa rota diretamente.
+// Middleware de API Key (Proteção Sever-to-Server)
 router.use(validateApiKey);
 
-// Python detectou um rosto e chama esta rota
-router.post('/registrar-presenca', iaController.registrarPresenca);
-
-// Rota auxiliar para validações de imagem
+// Rota interceptada pelo Zod para sanitizar os dados do Python
+router.post('/registrar-presenca', validate(registrarPresencaIaSchema), iaController.registrarPresenca);
 router.post('/validar-aluno', iaController.validarAluno);
 
 module.exports = router;

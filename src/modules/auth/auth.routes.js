@@ -7,4 +7,7 @@ const router = Router();
 
 router.post('/login', validate(loginSchema), authController.login);
 
+// Nova rota para o Miguel bater quando o Token de Acesso morrer
+router.post('/refresh', authController.refresh);
+
 module.exports = router;

@@ -1,43 +1,43 @@
 const alunoService = require('../alunos/aluno.service');
 const presencaService = require('../presencas/presenca.service');
+const presencaRepository = require('../presencas/presenca.repository'); // Importamos o repositório
 const AppError = require('../../utils/AppError');
 
 class IaService {
   async processarReconhecimento(data) {
     const { alunoId, turmaId, disciplinaId } = data;
 
-    // 1. Confirma se o aluno realmente existe (se o Pietro mandar um ID fantasma, barramos aqui)
+    // 1. Confirma se o aluno realmente existe e está ativo
     const aluno = await alunoService.buscarAlunoPorId(alunoId);
 
-    // 2. Aqui poderíamos ter regras de negócio específicas da IA.
-    // Exemplo: Verificar se a última presença desse aluno foi há menos de 5 minutos 
-    // para evitar que o sistema registre a presença duas vezes seguidas se ele ficar parado na frente da câmera.
+    // 2. REGRA DE DEDUPLICAÇÃO: O aluno já bateu o ponto hoje?
+    const jaRegistrado = await presencaRepository.verificarPresencaExistenteHoje(alunoId, turmaId);
 
-    // 3. Registra a presença usando o módulo que já criamos
+    if (jaRegistrado) {
+      // Devolvemos sucesso para o Python ficar tranquilo, mas não salvamos nada no banco!
+      return {
+        aluno: aluno.nome,
+        status: 'IGNORADO',
+        mensagem: 'O aluno já possui presença registrada para esta turma no dia de hoje.'
+      };
+    }
+
+    // 3. Se não bateu o ponto ainda, registra a presença normalmente
     const novaPresenca = await presencaService.registrarPresencaManual({
       alunoId,
       turmaId,
       disciplinaId,
-      status: 'PRESENTE' // A IA sempre registra como presente
+      status: 'PRESENTE'
     });
 
     return {
       aluno: aluno.nome,
+      status: 'REGISTRADO',
       presenca: novaPresenca
     };
   }
 
   async validarFaceAluno(arquivoImagem) {
-    // Este método servirá para o fluxo inverso: 
-    // Quando o frontend enviar uma foto no momento da matrícula,
-    // o Node.js usará o 'axios' para mandar essa foto para o Python treinar o rosto.
-    
-    /* Exemplo futuro de implementação:
-    const axios = require('axios');
-    const respostaPython = await axios.post('http://url-do-pietro/treinar', { imagem: arquivoImagem });
-    return respostaPython.data;
-    */
-    
     return { mensagem: 'Função de treinamento a ser implementada na integração final.' };
   }
 }

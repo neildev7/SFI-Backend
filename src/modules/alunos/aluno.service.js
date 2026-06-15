@@ -1,4 +1,5 @@
 const alunoRepository = require('./aluno.repository');
+const presencaRepository = require('../presencas/presenca.repository');
 const AppError = require('../../utils/AppError');
 
 class AlunoService {
@@ -12,15 +13,18 @@ class AlunoService {
     return await alunoRepository.create(data);
   }
 
-  async listarAlunos() {
-    return await alunoRepository.findAll();
+  async listarAlunos(pagina, limite) {
+    return await alunoRepository.findAll(pagina, limite);
   }
 
-  async buscarAlunoPorId(id) {
+ async buscarAlunoPorId(id) {
     const aluno = await alunoRepository.findById(id);
-    if (!aluno) {
-      throw new AppError('Aluno não encontrado.', 404);
+    
+    // Se o aluno não existir OU estiver inativo (deletado), dá erro.
+    if (!aluno || !aluno.ativo) {
+      throw new AppError('Aluno não encontrado ou inativo no sistema.', 404);
     }
+    
     return aluno;
   }
 
@@ -42,6 +46,45 @@ class AlunoService {
   async deletarAluno(id) {
     await this.buscarAlunoPorId(id);
     return await alunoRepository.delete(id);
+  }
+
+  async calcularFrequenciaPercentual(id) {
+    // 1. Garante que o aluno existe (nosso método já checa inclusive se está ativo)
+    await this.buscarAlunoPorId(id);
+
+    // 2. Busca a contagem agrupada no banco
+    const contagem = await presencaRepository.countByStatusAndAluno(id);
+
+    let presentes = 0;
+    let ausentes = 0;
+    let justificados = 0;
+
+    // 3. Separa os valores mapeados
+    contagem.forEach(item => {
+      if (item.status === 'PRESENTE') presentes = item._count._all;
+      if (item.status === 'AUSENTE') ausentes = item._count._all;
+      if (item.status === 'JUSTIFICADO') justificados = item._count._all;
+    });
+
+    const totalRegistros = presentes + ausentes + justificados;
+    let porcentagem = 0;
+
+    // 4. Calcula a porcentagem de presença (Presenças + Faltas Justificadas)
+    if (totalRegistros > 0) {
+      porcentagem = ((presentes + justificados) / totalRegistros) * 100;
+    }
+
+    // 5. Devolve o pacote mastigado
+    return {
+      alunoId: id,
+      totalRegistros,
+      detalhes: {
+        presentes,
+        ausentes,
+        justificados
+      },
+      frequenciaPercentual: Number(porcentagem.toFixed(2)) // Ex: 85.50
+    };
   }
 }
 

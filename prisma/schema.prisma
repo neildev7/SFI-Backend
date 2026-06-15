@@ -35,32 +35,37 @@ model Usuario {
   id           String   @id @default(uuid())
   nome         String
   email        String   @unique
-  senha        String   // Onde salvaremos a senha hasheada com bcrypt
+  senha        String   
   role         Role     @default(PROFESSOR)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("usuarios")
 }
 
 model Aluno {
   id              String       @id @default(uuid())
   nome            String
   matricula       String       @unique
-  fotoTreinamento String?      // Caminho/URL da foto base para a IA treinar o rosto
-  faceId          String?      // ID ou assinatura biométrica retornada pelo Python
-  criadoEm        DateTime     @default(now())
-  atualizadoEm    DateTime     @updatedAt
+  fotoTreinamento String?      @map("foto_treinamento")
+  faceId          String?      @map("face_id")
+  ativo           Boolean      @default(true)
+  criadoEm        DateTime     @default(now()) @map("criado_em")
+  atualizadoEm    DateTime     @updatedAt @map("atualizado_em")
   
   turmas          TurmaAluno[]
   presencas       Presenca[]
 
-  @@map("alunos") // Nome da tabela no banco
+  @@map("alunos")
 }
 
 model Turma {
   id           String       @id @default(uuid())
   nome         String
-  anoLetivo    Int
-  criadoEm     DateTime     @default(now())
+  anoLetivo    Int          @map("ano_letivo")
+  ativo        Boolean      @default(true)
+  criadoEm     DateTime     @default(now()) @map("criado_em")
   
   alunos       TurmaAluno[]
   presencas    Presenca[]
@@ -68,10 +73,10 @@ model Turma {
   @@map("turmas")
 }
 
-// Tabela pivô para relação N:N (Muitos alunos podem estar em muitas turmas)
 model TurmaAluno {
-  alunoId      String
-  turmaId      String
+  alunoId      String   @map("aluno_id")
+  turmaId      String   @map("turma_id")
+  ativo        Boolean  @default(true)
   
   aluno        Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
@@ -84,6 +89,7 @@ model Disciplina {
   id           String     @id @default(uuid())
   nome         String
   codigo       String     @unique
+  ativo        Boolean    @default(true)
   
   presencas    Presenca[]
 
@@ -92,16 +98,17 @@ model Disciplina {
 
 model Presenca {
   id           String         @id @default(uuid())
-  alunoId      String
-  turmaId      String
-  disciplinaId String?        // Opcional, caso a chamada seja por dia e não por aula específica
+  alunoId      String         @map("aluno_id")
+  turmaId      String         @map("turma_id")
+  disciplinaId String?        @map("disciplina_id")
+  ativo        Boolean        @default(true)
   status       StatusPresenca @default(PRESENTE)
-  dataHora     DateTime       @default(now()) // Horário exato que a IA bateu o ponto
+  dataHora     DateTime       @default(now()) @map("data_hora")
   
   aluno        Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   turma        Turma          @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   disciplina   Disciplina?    @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
 
-  @@index([alunoId, dataHora]) // Índice para agilizar os relatórios da secretaria/cozinha
+  @@index([alunoId, dataHora]) 
   @@map("presencas")
 }

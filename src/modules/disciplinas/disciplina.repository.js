@@ -6,8 +6,10 @@ class DisciplinaRepository {
   }
 
   async findAll() {
-    return await prisma.disciplina.findMany();
-  }
+    return await prisma.aluno.findMany({
+      where: { ativo: true }
+    });
+  }''
 
   async findById(id) {
     return await prisma.disciplina.findUnique({
@@ -21,16 +23,10 @@ class DisciplinaRepository {
     });
   }
 
-  async update(id, data) {
-    return await prisma.disciplina.update({
-      where: { id },
-      data
-    });
-  }
-
   async delete(id) {
-    return await prisma.disciplina.delete({
-      where: { id }
+    return await prisma.aluno.update({
+      where: { id },
+      data: { ativo: false }
     });
   }
 }

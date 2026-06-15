@@ -12,6 +12,7 @@ router.use(authenticate);
 
 router.get('/', alunoController.getAll);
 router.get('/:id', alunoController.getById);
+router.get('/:id/frequencia', alunoController.getFrequencia);
 
 // Aqui entram os validadores do Zod ANTES do controller
 router.post('/', authorize([ROLES.ADMIN, ROLES.SECRETARIA]), validate(createAlunoSchema), alunoController.create);

@@ -14,8 +14,13 @@ class AlunoController {
 
   async getAll(req, res, next) {
     try {
-      const alunos = await alunoService.listarAlunos();
-      return res.status(200).json({ status: 'success', data: alunos });
+      // Pega os parâmetros da URL. Se o Miguel não mandar nada, o padrão é página 1, 10 itens.
+      const pagina = req.query.page || 1;
+      const limite = req.query.limit || 10;
+
+      const resultado = await alunoService.listarAlunos(pagina, limite);
+      
+      return res.status(200).json({ status: 'success', data: resultado });
     } catch (error) {
       next(error);
     }
@@ -25,6 +30,15 @@ class AlunoController {
     try {
       const aluno = await alunoService.buscarAlunoPorId(req.params.id);
       return res.status(200).json({ status: 'success', data: aluno });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getFrequencia(req, res, next) {
+    try {
+      const estatisticas = await alunoService.calcularFrequenciaPercentual(req.params.id);
+      return res.status(200).json({ status: 'success', data: estatisticas });
     } catch (error) {
       next(error);
     }
