@@ -5,6 +5,7 @@ const logger = require('./utils/logger'); // Adicionado o nosso novo logger
 // Importação dos Jobs
 const verificarFaltasExcessivas = require('./jobs/verificarFaltasExcessivas');
 const gerarRelatorioMensal = require('./jobs/gerarRelatorioMensal');
+const iniciarCronJobs = require('./cron'); // <--- 1. IMPORTAMOS O ROBÔ DA MADRUGADA AQUI
 
 const PORT = process.env.PORT || 3000;
 
@@ -15,6 +16,8 @@ const server = app.listen(PORT, () => {
   // Inicia os trabalhos de fundo assim que o servidor sobe
   verificarFaltasExcessivas();
   gerarRelatorioMensal();
+  iniciarCronJobs(); // <--- 2. LIGAMOS O ROBÔ NA TOMADA AQUI!
+  
   logger.info('⏳ Cron Jobs de background ativados.');
 });
 

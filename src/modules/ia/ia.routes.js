@@ -12,5 +12,5 @@ router.use(validateApiKey);
 // Rota interceptada pelo Zod para sanitizar os dados do Python
 router.post('/registrar-presenca', validate(registrarPresencaIaSchema), iaController.registrarPresenca);
 router.post('/validar-aluno', iaController.validarAluno);
-
+router.get('/health', iaController.checkPythonStatus);
 module.exports = router;

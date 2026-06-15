@@ -52,6 +52,16 @@ class TurmaController {
     }
   }
 
+  async getConsolidadoFrequencia(req, res, next) {
+    try {
+      const { dataInicio, dataFim } = req.query;
+      const relatorio = await turmaService.relatorioConsolidadoFrequencia(req.params.id, dataInicio, dataFim);
+      return res.status(200).json({ status: 'success', data: relatorio });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async update(req, res, next) {
     try {
       const turmaAtualizada = await turmaService.atualizarTurma(req.params.id, req.body);

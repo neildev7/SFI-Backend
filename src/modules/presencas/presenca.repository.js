@@ -111,25 +111,86 @@ class PresencaRepository {
     return !!presenca; // Retorna true se encontrou, false se não encontrou
   }
 
-  // Busca o registro completo de hoje do aluno na turma
+  // Busca o registro completo de hoje do aluno na turma (Corrigido com dayjs)
   async buscarPresencaCompletaDeHoje(alunoId, turmaId) {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Zera as horas para pegar do início do dia
+    const inicioDoDia = dayjs().startOf('day').toDate();
+    const fimDoDia = dayjs().endOf('day').toDate();
 
     return await prisma.presenca.findFirst({
       where: {
         alunoId,
         turmaId,
-        dataHora: { gte: hoje }
+        dataHora: { 
+          gte: inicioDoDia,
+          lte: fimDoDia 
+        }
+      }
+    });
+  }
+
+  // Busca o registro completo do aluno em uma disciplina específica no dia de hoje (Corrigido com dayjs)
+  async buscarPresencaDeHojePorDisciplina(alunoId, turmaId, disciplinaId) {
+    const inicioDoDia = dayjs().startOf('day').toDate();
+    const fimDoDia = dayjs().endOf('day').toDate();
+
+    return await prisma.presenca.findFirst({
+      where: {
+        alunoId,
+        turmaId,
+        disciplinaId, 
+        dataHora: { 
+          gte: inicioDoDia,
+          lte: fimDoDia 
+        }
       }
     });
   }
 
   // Atualiza apenas o campo de saída
-  async registrarSaida(presencaId) {
+  async registrarSaida(presencaId, novoStatus = null) {
+    const dataUpdate = { dataHoraSaida: new Date() };
+
+    // Se o service detetar que foi mais cedo, nós atualizamos o status da presença
+    if (novoStatus) {
+      dataUpdate.status = novoStatus;
+    }
+
     return await prisma.presenca.update({
       where: { id: presencaId },
-      data: { dataHoraSaida: new Date() }
+      data: dataUpdate
+    });
+  }
+  // 1. Conta presenças agrupadas por disciplina para o relatório por matéria
+  async countAgrupadoPorDisciplina(alunoId, dataInicio, dataFim) {
+    const whereClause = { alunoId };
+
+    if (dataInicio || dataFim) {
+      whereClause.dataHora = {};
+      if (dataInicio) whereClause.dataHora.gte = new Date(dataInicio);
+      if (dataFim) whereClause.dataHora.lte = new Date(dataFim);
+    }
+
+    return await prisma.presenca.groupBy({
+      by: ['disciplinaId', 'status'],
+      where: whereClause,
+      _count: { _all: true }
+    });
+  }
+
+  // 2. Conta as presenças de todos os alunos de uma turma específica (para o consolidado da secretaria)
+  async countConsolidadoPorTurma(turmaId, dataInicio, dataFim) {
+    const whereClause = { turmaId };
+
+    if (dataInicio || dataFim) {
+      whereClause.dataHora = {};
+      if (dataInicio) whereClause.dataHora.gte = new Date(dataInicio);
+      if (dataFim) whereClause.dataHora.lte = new Date(dataFim);
+    }
+
+    return await prisma.presenca.groupBy({
+      by: ['alunoId', 'status'],
+      where: whereClause,
+      _count: { _all: true }
     });
   }
 }

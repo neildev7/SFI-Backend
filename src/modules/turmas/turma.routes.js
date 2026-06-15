@@ -13,6 +13,7 @@ router.use(authenticate);
 router.get('/', turmaController.getAll);
 router.get('/:id', turmaController.getById);
 router.get('/:id/alunos', turmaController.getAlunosDaTurma);
+router.get('/:id/frequencia/consolidado', turmaController.getConsolidadoFrequencia);
 
 // Validadores do Zod injetados nas rotas de modificação
 router.post('/', authorize([ROLES.ADMIN, ROLES.SECRETARIA]), validate(createTurmaSchema), turmaController.create);

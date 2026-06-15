@@ -1,59 +1,82 @@
-const relatorioRepository = require('./relatorio.repository');
+const prisma = require('../../database/client');
 const dayjs = require('dayjs');
+const alunoService = require('../alunos/aluno.service'); // Para reaproveitar a matemática de frequência
 
 class RelatorioService {
-  async gerarRelatorioCozinha() {
-    // Regra da Cozinha: Contar presenças de hoje, da 00:00 até as 10:00 da manhã
-    const inicioDoDia = dayjs().startOf('day').toDate();
-    const horarioDeCorte = dayjs().hour(10).minute(0).second(0).toDate();
+  // 1. Relatório da Cozinha (Refutando o Claude: O turno vem da relação com a Turma!)
+  async previsaoCozinha(dataRef) {
+    const dataBusca = dataRef ? dayjs(dataRef) : dayjs();
+    const inicioDoDia = dataBusca.startOf('day').toDate();
+    const fimDoDia = dataBusca.endOf('day').toDate();
 
-    const totalRefeicoesEstimadas = await relatorioRepository.contarPresencasPorPeriodo(inicioDoDia, horarioDeCorte);
+    // Pega todo mundo que marcou presença, chegou atrasado ou saiu mais cedo
+    const presencas = await prisma.presenca.findMany({
+      where: {
+        dataHora: { gte: inicioDoDia, lte: fimDoDia },
+        status: { in: ['PRESENTE', 'ATRASO', 'SAIDA_ANTECIPADA'] }
+      },
+      include: { turma: true } // <--- A mágica da normalização aqui!
+    });
 
-    return {
-      data: dayjs().format('YYYY-MM-DD'),
-      horarioDeCorte: '10:00',
-      totalRefeicoesEstimadas,
-      mensagem: `A cozinha deve preparar ${totalRefeicoesEstimadas} refeições com base nas presenças registradas até as 10h.`
-    };
+    const previsao = { MANHA: 0, TARDE: 0, NOITE: 0, INTEGRAL: 0, TOTAL: 0 };
+
+    presencas.forEach(p => {
+      if (p.turma && p.turma.turno) {
+        previsao[p.turma.turno]++;
+        previsao.TOTAL++;
+      }
+    });
+
+    return { data: dataBusca.format('YYYY-MM-DD'), previsao };
   }
 
-  async gerarRelatorioSecretaria() {
-    // Secretaria quer uma visão geral do dia (00:00 às 23:59)
-    const inicioDoDia = dayjs().startOf('day').toDate();
-    const fimDoDia = dayjs().endOf('day').toDate();
+  // 2. Lista de Ausentes por Dia e Turma
+  async listarAusentes(turmaId, dataRef) {
+    const dataBusca = dataRef ? dayjs(dataRef) : dayjs();
+    const inicioDoDia = dataBusca.startOf('day').toDate();
+    const fimDoDia = dataBusca.endOf('day').toDate();
 
-    const totalPresentesHoje = await relatorioRepository.contarPresencasPorPeriodo(inicioDoDia, fimDoDia);
+    const faltas = await prisma.presenca.findMany({
+      where: {
+        turmaId,
+        dataHora: { gte: inicioDoDia, lte: fimDoDia },
+        status: 'AUSENTE'
+      },
+      include: { aluno: { select: { id: true, nome: true, matricula: true } } }
+    });
 
-    return {
-      data: dayjs().format('YYYY-MM-DD'),
-      totalPresentesHoje
-    };
+    return faltas.map(f => ({
+      alunoId: f.aluno.id,
+      nome: f.aluno.nome,
+      matricula: f.aluno.matricula,
+      dataFalta: f.dataHora
+    }));
   }
 
-  async gerarRelatorioDiario() {
-    // Retorna a contagem de presenças agrupadas por turma no dia de hoje
-    const inicioDoDia = dayjs().startOf('day').toDate();
-    const fimDoDia = dayjs().endOf('day').toDate();
+  // 3. Alunos com Baixa Frequência (Filtro Global)
+  async listarAlunosBaixaFrequencia(limiar = 75, dataInicio, dataFim) {
+    // Pega todos os alunos ativos
+    const alunos = await prisma.aluno.findMany({ where: { ativo: true } });
+    const alunosEmRisco = [];
 
-    const frequenciaPorTurma = await relatorioRepository.buscarFrequenciaAgrupadaPorTurma(inicioDoDia, fimDoDia);
+    // Para cada aluno, calcula a frequência no período usando nosso motor pronto
+    for (const aluno of alunos) {
+      const relatorio = await alunoService.calcularFrequenciaPercentual(aluno.id, dataInicio, dataFim);
+      
+      // Se a frequência for menor que o limiar (ex: 75), entra pra lista vermelha
+      if (relatorio.frequenciaPercentual < Number(limiar)) {
+        alunosEmRisco.push({
+          alunoId: aluno.id,
+          nome: aluno.nome,
+          matricula: aluno.matricula,
+          frequencia: relatorio.frequenciaPercentual,
+          statusRisco: relatorio.statusRisco
+        });
+      }
+    }
 
-    return {
-      data: dayjs().format('YYYY-MM-DD'),
-      frequenciaPorTurma
-    };
-  }
-
-  async gerarRelatorioMensal() {
-    // Pega o primeiro e o último dia do mês atual
-    const inicioDoMes = dayjs().startOf('month').toDate();
-    const fimDoMes = dayjs().endOf('month').toDate();
-
-    const frequenciaMensalPorTurma = await relatorioRepository.buscarFrequenciaAgrupadaPorTurma(inicioDoMes, fimDoMes);
-
-    return {
-      mes: dayjs().format('MMMM/YYYY'),
-      frequenciaPorTurma: frequenciaMensalPorTurma
-    };
+    // Ordena dos mais faltosos para os menos faltosos
+    return alunosEmRisco.sort((a, b) => a.frequencia - b.frequencia);
   }
 }
 

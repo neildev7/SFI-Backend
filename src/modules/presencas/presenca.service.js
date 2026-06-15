@@ -50,6 +50,56 @@ class PresencaService {
   async listarPresencasHoje() {
     return await presencaRepository.findPresencasDeHoje();
   }
+  // O Robô da Madrugada: Processa faltas automáticas para quem não foi na aula
+  async processarFaltasAutomaticasDoDia() {
+    const dayjs = require('dayjs');
+    const prisma = require('../../database/client'); // Importa o prisma direto para queries complexas
+
+    const diasSemanaMap = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+    const diaAtualEnum = diasSemanaMap[dayjs().day()];
+
+    if (diaAtualEnum === 'DOMINGO') return; // Não faz nada no domingo
+
+    console.log('🤖 [CRON JOB] Iniciando varredura de faltas automáticas...');
+
+    // 1. Busca todas as aulas que aconteceram hoje na grade horária
+    const aulasDeHoje = await prisma.horario.findMany({
+      where: { diaSemana: diaAtualEnum, ativo: true },
+      include: { turma: { include: { alunos: { include: { aluno: true } } } } }
+    });
+
+    let faltasRegistradas = 0;
+
+    // 2. Para cada aula de hoje...
+    for (const aula of aulasDeHoje) {
+      const turmaId = aula.turmaId;
+      const disciplinaId = aula.disciplinaId;
+
+      // 3. Pega os alunos matriculados e ativos nessa turma
+      const alunosDaTurma = aula.turma.alunos.filter(vinculo => vinculo.aluno.ativo);
+
+      for (const vinculo of alunosDaTurma) {
+        const alunoId = vinculo.alunoId;
+
+        // 4. Verifica se o aluno teve presença (ou falta justificada) nessa aula hoje
+        const presencaHoje = await presencaRepository.buscarPresencaDeHojePorDisciplina(alunoId, turmaId, disciplinaId);
+
+        // 5. Se NÃO tem registro nenhum, ele faltou! A canetada acontece aqui.
+        if (!presencaHoje) {
+          await presencaRepository.create({
+            alunoId,
+            turmaId,
+            disciplinaId,
+            status: 'AUSENTE',
+            origem: 'SISTEMA', // Origem automática!
+          });
+          faltasRegistradas++;
+        }
+      }
+    }
+
+    console.log(`🤖 [CRON JOB] Varredura concluída. ${faltasRegistradas} faltas registradas.`);
+  }
 }
 
 module.exports = new PresencaService();

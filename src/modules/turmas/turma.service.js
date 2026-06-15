@@ -72,6 +72,52 @@ class TurmaService {
 
     return turmaDeletada;
   }
+
+  // NOVO: Retorna a lista de todos os alunos da turma com suas respectivas frequências no período
+  async relatorioConsolidadoFrequencia(turmaId, dataInicio, dataFim) {
+    await this.buscarTurmaPorId(turmaId);
+    
+    // Busca o mapa de contagens de todos os alunos da turma de uma vez
+    const registros = await presencaRepository.countConsolidadoPorTurma(turmaId, dataInicio, dataFim);
+    const prisma = require('../../database/client');
+    
+    // Busca os alunos matriculados para cruzar com os nomes
+    const turmaComAlunos = await prisma.turma.findUnique({
+      where: { id: turmaId },
+      include: { alunos: { include: { aluno: true } } }
+    });
+
+    const mapaAlunos = {};
+    registros.forEach(item => {
+      if (!mapaAlunos[item.alunoId]) {
+        mapaAlunos[item.alunoId] = { presentes: 0, ausentes: 0, justificados: 0, atrasos: 0, saidasAntecipadas: 0 };
+      }
+      if (item.status === 'PRESENTE') mapaAlunos[item.alunoId].presentes = item._count._all;
+      if (item.status === 'AUSENTE') mapaAlunos[item.alunoId].ausentes = item._count._all;
+      if (item.status === 'JUSTIFICADO') mapaAlunos[item.alunoId].justificados = item._count._all;
+      if (item.status === 'ATRASO') mapaAlunos[item.alunoId].atrasos = item._count._all;
+      if (item.status === 'SAIDA_ANTECIPADA') mapaAlunos[item.alunoId].saidasAntecipadas = item._count._all;
+    });
+
+    const consolidado = turmaComAlunos.alunos.map(vinculo => {
+      const aluno = vinculo.aluno;
+      const dados = mapaAlunos[aluno.id] || { presentes: 0, ausentes: 0, justificados: 0, atrasos: 0, saidasAntecipadas: 0 };
+      
+      const totalAulas = dados.presentes + dados.ausentes + dados.justificados + dados.atrasos + dados.saidasAntecipadas;
+      const pct = totalAulas > 0 ? ((dados.presentes + dados.justificados + dados.atrasos + dados.saidasAntecipadas) / totalAulas) * 100 : 100;
+
+      return {
+        alunoId: aluno.id,
+        nome: aluno.nome,
+        matricula: aluno.matricula,
+        totalAulasNoPeriodo: totalAulas,
+        frequenciaPercentual: Number(pct.toFixed(2)),
+        statusRisco: pct < 75.0 ? 'EM_RISCO' : 'REGULAR'
+      };
+    });
+
+    return consolidado;
+  }
 }
 
 module.exports = new TurmaService();

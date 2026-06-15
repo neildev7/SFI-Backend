@@ -13,6 +13,7 @@ datasource db {
 // --------------------------------------------------
 // ENUMS (Listas de valores fixos)
 // --------------------------------------------------
+
 enum Role {
   ADMIN
   PROFESSOR
@@ -25,12 +26,19 @@ enum StatusPresenca {
   PRESENTE
   AUSENTE
   JUSTIFICADO
+  ATRASO            
+  SAIDA_ANTECIPADA  
 }
 
-// NOVO: Enum para rastrear a origem do registro
 enum OrigemPresenca {
   FACIAL
   MANUAL
+  SISTEMA // <--- Adicionado para o nosso Cron Job de faltas automáticas!
+}
+
+enum ResultadoIA {
+  ACEITO
+  REJEITADO
 }
 
 enum Turno {
@@ -61,30 +69,18 @@ enum AcaoAudit {
 // --------------------------------------------------
 
 model Usuario {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   nome         String
-  email        String   @unique
+  email        String     @unique
   senha        String   
-  role         Role     @default(PROFESSOR)
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+  role         Role       @default(PROFESSOR)
+  ativo        Boolean    @default(true)
+  criadoEm     DateTime   @default(now()) @map("criado_em")
+  atualizadoEm DateTime   @updatedAt @map("atualizado_em")
+  
   auditLogs    AuditLog[]
+  
   @@map("usuarios")
-}
-
-model Justificativa {
-  id         String   @id @default(uuid())
-  presencaId String   @unique @map("presenca_id") // Relação 1:1
-  motivo     String   // Ex: "Atestado Médico - Virose"
-  anexoUrl   String?  @map("anexo_url") // Caso o Miguel no Flutter mande a foto do atestado pro S3/Firebase
-  aprovadoPor String? @map("aprovado_por") // Qual usuário da secretaria aprovou?
-  criadoEm   DateTime @default(now()) @map("criado_em")
-
-  // A relação de volta
-  presenca   Presenca @relation(fields: [presencaId], references: [id], onDelete: Cascade)
-
-  @@map("justificativas")
 }
 
 model Aluno {
@@ -96,42 +92,13 @@ model Aluno {
   ativo           Boolean      @default(true)
   criadoEm        DateTime     @default(now()) @map("criado_em")
   atualizadoEm    DateTime     @updatedAt @map("atualizado_em")
-  alertas Alerta[]
+  
+  alertas         Alerta[]
+  iaLogs          IaLog[]      // <--- Relação atualizada pro modelo novo!
   turmas          TurmaAluno[]
   presencas       Presenca[]
 
   @@map("alunos")
-}
-
-model AuditLog {
-  id           String    @id @default(uuid())
-  usuarioId    String?   @map("usuario_id") // Pode ser nulo se a ação for automática (ex: IA)
-  acao         AcaoAudit
-  entidade     String    // Qual tabela foi mexida? Ex: "Aluno", "Presenca"
-  entidadeId   String?   @map("entidade_id") // Qual o ID do registro alterado?
-  dadosAntigos Json?     @map("dados_antigos") // Como era antes (formato JSON)
-  dadosNovos   Json?     @map("dados_novos")   // Como ficou depois (formato JSON)
-  ip           String?   // Rastreio de onde veio a requisição
-  criadoEm     DateTime  @default(now()) @map("criado_em")
-
-  usuario      Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  @@map("audit_logs")
-}
-
-model Horario {
-  id           String     @id @default(uuid())
-  turmaId      String     @map("turma_id")
-  disciplinaId String     @map("disciplina_id")
-  diaSemana    DiaSemana  @map("dia_semana")
-  horaInicio   String     @map("hora_inicio") // Vamos usar String no formato "07:30" para facilitar a comparação no Node
-  horaFim      String     @map("hora_fim")    // Formato "11:30"
-  ativo        Boolean    @default(true)
-
-  turma        Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
-  disciplina   Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
-
-  @@map("horarios")
 }
 
 model Turma {
@@ -144,55 +111,101 @@ model Turma {
   
   alunos       TurmaAluno[]
   presencas    Presenca[]
-  horarios     Horario[]    // <--- FALTAVA ESSA LINHA
-  alertas Alerta[]
+  horarios     Horario[]    
+  iaLogs       IaLog[]      // <--- Relação atualizada pro modelo novo!
+  alertas      Alerta[]
+  
   @@map("turmas")
 }
 
 model TurmaAluno {
-  alunoId      String   @map("aluno_id")
-  turmaId      String   @map("turma_id")
-  ativo        Boolean  @default(true)
+  alunoId      String       @map("aluno_id")
+  turmaId      String       @map("turma_id")
+  ativo        Boolean      @default(true)
   
-  aluno        Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  aluno        Aluno        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma        Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
 
   @@id([alunoId, turmaId])
   @@map("turmas_alunos")
 }
 
 model Disciplina {
-  id           String     @id @default(uuid())
+  id           String       @id @default(uuid())
   nome         String
-  codigo       String     @unique
-  ativo        Boolean    @default(true)
+  codigo       String       @unique
+  ativo        Boolean      @default(true)
   
   presencas    Presenca[]
-  horarios     Horario[]  // <--- FALTAVA ESSA LINHA
+  horarios     Horario[]  
 
   @@map("disciplinas")
 }
 
+model Horario {
+  id           String       @id @default(uuid())
+  turmaId      String       @map("turma_id")
+  disciplinaId String       @map("disciplina_id")
+  diaSemana    DiaSemana    @map("dia_semana")
+  horaInicio   String       @map("hora_inicio") 
+  horaFim      String       @map("hora_fim")    
+  ativo        Boolean      @default(true)
+
+  turma        Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina   @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@map("horarios")
+}
+
 model Presenca {
-  id           String         @id @default(uuid())
-  alunoId      String         @map("aluno_id")
-  turmaId      String         @map("turma_id")
-  disciplinaId String?        @map("disciplina_id")
-  status       StatusPresenca @default(PRESENTE)
+  id            String         @id @default(uuid())
+  alunoId       String         @map("aluno_id")
+  turmaId       String         @map("turma_id")
+  disciplinaId  String?        @map("disciplina_id")
+  status        StatusPresenca @default(PRESENTE)
   
-  origem       OrigemPresenca @default(MANUAL)
-  faceScore    Float?         @map("face_score")
+  origem        OrigemPresenca @default(MANUAL)
+  faceScore     Float?         @map("face_score")
   
-  dataHora     DateTime       @default(now()) @map("data_hora")
-  dataHoraSaida DateTime?     @map("data_hora_saida") // <--- O NOVO CAMPO AQUI!
+  dataHora      DateTime       @default(now()) @map("data_hora")
+  dataHoraSaida DateTime?      @map("data_hora_saida") 
   
-  aluno        Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  turma        Turma          @relation(fields: [turmaId], references: [id], onDelete: Cascade)
-  disciplina   Disciplina?    @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
+  aluno         Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma         Turma          @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina    Disciplina?    @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
   justificativa Justificativa?
 
   @@index([alunoId, dataHora]) 
   @@map("presencas")
+}
+
+model Justificativa {
+  id          String   @id @default(uuid())
+  presencaId  String   @unique @map("presenca_id") 
+  motivo      String   
+  anexoUrl    String?  @map("anexo_url") 
+  aprovadoPor String?  @map("aprovado_por") 
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  presenca    Presenca @relation(fields: [presencaId], references: [id], onDelete: Cascade)
+
+  @@map("justificativas")
+}
+
+model IaLog {
+  id          String      @id @default(uuid())
+  alunoId     String?     @map("aluno_id")
+  turmaId     String?     @map("turma_id")
+  faceScore   Float?      @map("face_score")
+  imagemHash  String?     @map("imagem_hash") 
+  resultado   ResultadoIA
+  motivo      String?     
+  criadoEm    DateTime    @default(now()) @map("criado_em")
+
+  aluno       Aluno?      @relation(fields: [alunoId], references: [id], onDelete: SetNull)
+  turma       Turma?      @relation(fields: [turmaId], references: [id], onDelete: SetNull)
+
+  @@map("ia_logs")
 }
 
 model Alerta {
@@ -207,4 +220,20 @@ model Alerta {
   turma     Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
 
   @@map("alertas")
+}
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  usuarioId    String?   @map("usuario_id") 
+  acao         AcaoAudit
+  entidade     String    
+  entidadeId   String?   @map("entidade_id") 
+  dadosAntigos Json?     @map("dados_antigos") 
+  dadosNovos   Json?     @map("dados_novos")  
+  ip           String?   
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+
+  usuario      Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
 }

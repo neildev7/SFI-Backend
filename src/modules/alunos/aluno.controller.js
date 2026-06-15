@@ -69,6 +69,16 @@ class AlunoController {
       next(error);
     }
   }
+  
+  async getFrequenciaDisciplinas(req, res, next) {
+    try {
+      const { dataInicio, dataFim } = req.query; // Permite filtros dinâmicos de período!
+      const relatorio = await alunoService.calcularFrequenciaPorDisciplina(req.params.id, dataInicio, dataFim);
+      return res.status(200).json({ status: 'success', data: relatorio });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AlunoController();

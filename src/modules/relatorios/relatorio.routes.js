@@ -6,15 +6,13 @@ const ROLES = require('../../constants/roles');
 
 const router = Router();
 
-// Protege todas as rotas de relatórios
+// Apenas usuários logados e com nível administrativo podem tirar relatórios gerenciais
 router.use(authenticate);
+router.use(authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.COZINHA]));
 
-// Rota exclusiva para a equipe da cozinha e administradores
-router.get('/cozinha', authorize([ROLES.ADMIN, ROLES.COZINHA]), relatorioController.getCozinha);
-
-// Rotas exclusivas para gestão e secretaria
-router.get('/secretaria', authorize([ROLES.ADMIN, ROLES.SECRETARIA]), relatorioController.getSecretaria);
-router.get('/diario', authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.PROFESSOR]), relatorioController.getDiario);
-router.get('/mensal', authorize([ROLES.ADMIN, ROLES.SECRETARIA]), relatorioController.getMensal);
+// Endpoints exatamente como o Claude pediu
+router.get('/cozinha', relatorioController.getCozinha);
+router.get('/secretaria/ausentes', relatorioController.getAusentes);
+router.get('/secretaria/baixa-frequencia', relatorioController.getBaixaFrequencia);
 
 module.exports = router;
