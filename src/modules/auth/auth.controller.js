@@ -29,6 +29,18 @@ class AuthController {
       next(error);
     }
   }
+
+  async logout(req, res) {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      if (!global.tokenBlacklist) global.tokenBlacklist = new Set();
+      
+      // Adiciona o token na lista negra!
+      global.tokenBlacklist.add(token);
+    }
+    return res.status(200).json({ message: 'Logout realizado com sucesso.' });
+  }
 }
 
 module.exports = new AuthController();

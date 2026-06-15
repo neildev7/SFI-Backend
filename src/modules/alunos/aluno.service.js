@@ -122,6 +122,26 @@ class AlunoService {
       frequenciaPercentual: frequenciaFinal
     };
   }
+  // O Direito ao Esquecimento (LGPD) - Exclui TUDO fisicamente do banco
+  async exclusaoDefinitivaLGPD(id, usuarioLogadoId) {
+    const aluno = await this.buscarAlunoPorId(id);
+    const prisma = require('../../database/client');
+    const auditService = require('../auditoria/audit.service');
+
+    // O Prisma (com onDelete: Cascade) vai varrer todas as presenças, turmas e justificativas
+    await prisma.aluno.delete({ where: { id } });
+
+    // Registra na auditoria que os dados foram obliterados para provar conformidade
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'DELETE',
+      entidade: 'Aluno_LGPD',
+      entidadeId: id,
+      dadosAntigos: { mensagem: "Dados pessoais completamente apagados conforme Direito ao Esquecimento (Art. 18, VI, LGPD)" }
+    });
+
+    return { message: 'Dados do aluno foram permanentemente apagados do sistema.' };
+  }
 }
 
 module.exports = new AlunoService();
