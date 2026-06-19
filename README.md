@@ -119,6 +119,8 @@ O ecossistema é dividido em 13 módulos focados em responsabilidade única:
 
 ---
 
+Em Produção: Utilize npx prisma migrate deploy para aplicar as alterações do banco de forma segura.
+
 ##  Decisões Arquiteturais e Trade-offs
 
 * **Blacklist de JWT em Memória vs Redis:**

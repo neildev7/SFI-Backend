@@ -1,8 +1,7 @@
 const axios = require('axios');
 const alunoService = require('../alunos/aluno.service');
-const presencaService = require('../presencas/presenca.service');
-const presencaRepository = require('../presencas/presenca.repository');
 const horarioService = require('../horarios/horario.service');
+const presencaRepository = require('../presencas/presenca.repository');
 const AppError = require('../../utils/AppError');
 const prisma = require('../../database/client');
 
@@ -21,14 +20,13 @@ const pythonClient = axios.create({
 
 class IaService {
   async processarReconhecimento(data) {
-    const { alunoId, turmaId, faceScore, imagemHash } = data; // Recebe o imagemHash opcional da requisição
+    const { alunoId, turmaId, faceScore, imagemHash } = data;
 
     const aluno = await alunoService.buscarAlunoPorId(alunoId);
     const scoreFormatado = faceScore ? (faceScore * 100).toFixed(1) : '0.0';
     
     // 1. Validação de Limiar de Confiança (Se falhar, gera log de REJEITADO)
     if (faceScore !== undefined && faceScore !== null && faceScore < THRESHOLD_CONFIANCA_IA) {
-      
       await prisma.iaLog.create({
         data: {
           alunoId: aluno.id,
@@ -39,7 +37,6 @@ class IaService {
           motivo: `Baixa confiança (${scoreFormatado}%). Mínimo exigido é ${THRESHOLD_CONFIANCA_IA * 100}%.`
         }
       });
-
       throw new AppError(`Reconhecimento rejeitado. Baixa confiança (${scoreFormatado}%).`, 422);
     }
 
@@ -52,19 +49,29 @@ class IaService {
     if (presencaHoje) {
       if (!presencaHoje.dataHoraSaida) {
         const statusSaida = await horarioService.validarStatusSaida(turmaId, disciplinaId);
-        const saidaRegistrada = await presencaRepository.registrarSaida(presencaHoje.id, statusSaida);
         
-        // Log de sucesso na saída
-        await prisma.iaLog.create({
-          data: {
-            alunoId: aluno.id,
-            turmaId,
-            faceScore,
-            imagemHash: imagemHash || null,
-            resultado: 'ACEITO',
-            motivo: statusSaida === 'SAIDA_ANTECIPADA' ? 'Saída antecipada registrada.' : 'Saída normal registrada.'
-          }
-        });
+        // ----------------------------------------------------------------
+        // 🔥 TRANSAÇÃO ATÔMICA DA SAÍDA (Ou grava tudo, ou dá rollback)
+        // ----------------------------------------------------------------
+        const [saidaRegistrada, logSaida] = await prisma.$transaction([
+          prisma.presenca.update({
+            where: { id: presencaHoje.id },
+            data: {
+              dataHoraSaida: new Date(),
+              status: statusSaida // Muda para SAIDA_ANTECIPADA se necessário
+            }
+          }),
+          prisma.iaLog.create({
+            data: {
+              alunoId: aluno.id,
+              turmaId,
+              faceScore,
+              imagemHash: imagemHash || null,
+              resultado: 'ACEITO',
+              motivo: statusSaida === 'SAIDA_ANTECIPADA' ? 'Saída antecipada registrada.' : 'Saída normal registrada.'
+            }
+          })
+        ]);
 
         return {
           aluno: aluno.nome,
@@ -80,27 +87,36 @@ class IaService {
       }
     }
 
-    // 4. Registra a Entrada com Sucesso
-    const novaPresenca = await presencaService.registrarPresencaManual({
-      alunoId,
-      turmaId,
-      disciplinaId,
-      status: statusCalculado,
-      origem: 'FACIAL',
-      faceScore: faceScore || null
-    });
+    // ----------------------------------------------------------------
+    // 🔥 TRANSAÇÃO ATÔMICA DA ENTRADA (A exigência do Claude resolvida)
+    // ----------------------------------------------------------------
+    const [novaPresenca, novoLogIa] = await prisma.$transaction([
+      
+      // 1. Cria a Presença diretamente pelo Prisma para garantir a transação
+      prisma.presenca.create({
+        data: {
+          alunoId: aluno.id,
+          turmaId: turmaId,
+          disciplinaId: disciplinaId,
+          status: statusCalculado,
+          origem: 'FACIAL',
+          faceScore: faceScore || null,
+          dataHora: new Date()
+        }
+      }),
 
-    // Log de sucesso na entrada (Auditoria LGPD completa!)
-    await prisma.iaLog.create({
-      data: {
-        alunoId: aluno.id,
-        turmaId,
-        faceScore,
-        imagemHash: imagemHash || null,
-        resultado: 'ACEITO',
-        motivo: `Entrada registrada com status: ${statusCalculado}.`
-      }
-    });
+      // 2. Cria a Auditoria da LGPD na mesma tacada
+      prisma.iaLog.create({
+        data: {
+          alunoId: aluno.id,
+          turmaId,
+          faceScore,
+          imagemHash: imagemHash || null,
+          resultado: 'ACEITO',
+          motivo: `Entrada registrada com status: ${statusCalculado}.`
+        }
+      })
+    ]);
 
     return {
       aluno: aluno.nome,
@@ -111,10 +127,8 @@ class IaService {
 
   // 5. Envio de foto pro Python com Retry, Backoff e CIRCUIT BREAKER!
   async validarFaceAluno(arquivoImagem) {
-    // Verifica se o Circuit Breaker está aberto (bloqueando requisições)
     if (circuitAberto) {
       if (Date.now() > tempoRecuperacaoCircuit) {
-        // Tempo de tolerância passou, tenta fechar o circuito para testar a rede novamente
         circuitAberto = false;
         falhasSeguidas = 0;
       } else {
@@ -128,8 +142,6 @@ class IaService {
     while (tentativas < maxTentativas) {
       try {
         const response = await pythonClient.post('/reconhecer', { imagem: arquivoImagem });
-        
-        // Se deu certo, reseta o contador de falhas do Circuit Breaker
         falhasSeguidas = 0;
         return response.data;
       } catch (error) {
@@ -138,18 +150,13 @@ class IaService {
 
         if (tentativas >= maxTentativas) {
           falhasSeguidas++;
-          
-          // Se o Python falhar consecutivamente 5 vezes seguidas na fila, abre o circuito!
           if (falhasSeguidas >= 5) {
             circuitAberto = true;
-            tempoRecuperacaoCircuit = Date.now() + 30000; // Bloqueia chamadas por 30 segundos
+            tempoRecuperacaoCircuit = Date.now() + 30000;
             console.error('🚨 [CIRCUIT BREAKER] Circuito aberto! Protegendo o servidor Node de sobrecarga.');
           }
-
           throw new AppError('Falha crítica de comunicação com o microsserviço de IA.', 503);
         }
-
-        // Retry com Backoff exponencial simples
         await new Promise(resolve => setTimeout(resolve, tentativas * 1000));
       }
     }

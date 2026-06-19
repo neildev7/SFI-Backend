@@ -36,8 +36,14 @@ class AuthController {
       const token = authHeader.split(' ')[1];
       if (!global.tokenBlacklist) global.tokenBlacklist = new Set();
       
-      // Adiciona o token na lista negra!
       global.tokenBlacklist.add(token);
+
+      const fs = require('fs');
+      const path = require('path');
+      fs.writeFileSync(
+        path.join(__dirname, '../../../blacklist.json'), 
+        JSON.stringify(Array.from(global.tokenBlacklist))
+      );
     }
     return res.status(200).json({ message: 'Logout realizado com sucesso.' });
   }

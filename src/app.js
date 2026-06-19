@@ -15,6 +15,8 @@ const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
 const usuarioRoutes = require('./modules/usuarios/usuario.routes');
 const horarioRoutes = require('./modules/horarios/horario.routes');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 const app = express();
 
@@ -44,6 +46,7 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 
 app.use(`${appConfig.apiPrefix}/auth`, authRoutes);
+app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(`${appConfig.apiPrefix}/alunos`, alunoRoutes);
 app.use(`${appConfig.apiPrefix}/turmas`, turmaRoutes);
 app.use(`${appConfig.apiPrefix}/disciplinas`, disciplinaRoutes);

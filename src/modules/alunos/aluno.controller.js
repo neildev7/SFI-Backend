@@ -14,11 +14,17 @@ class AlunoController {
 
   async getAll(req, res, next) {
     try {
-      // Pega os parâmetros da URL. Se o Miguel não mandar nada, o padrão é página 1, 10 itens.
-      const pagina = req.query.page || 1;
-      const limite = req.query.limit || 10;
+      // 1. Pega a página da URL e converte para número (se vier vazio, o padrão é 1)
+      const pagina = parseInt(req.query.page, 10) || 1;
+      
+      // 2. Pega o limite pedido. Se não mandar nada, o padrão é 10.
+      const limiteSolicitado = parseInt(req.query.limit, 10) || 10;
 
-      const resultado = await alunoService.listarAlunos(pagina, limite);
+      // 3. A TRAVA SÊNIOR: Pega o que o Miguel pediu, mas bloqueia no máximo em 100!
+      const limiteSeguro = Math.min(limiteSolicitado, 100);
+
+      // 4. Manda as variáveis blindadas para o Service buscar
+      const resultado = await alunoService.listarAlunos(pagina, limiteSeguro);
       
       return res.status(200).json({ status: 'success', data: resultado });
     } catch (error) {
