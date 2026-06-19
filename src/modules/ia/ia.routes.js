@@ -7,14 +7,19 @@ const { registrarPresencaIaSchema } = require('../../validators/ia.validator');
 
 const router = Router();
 
-// Middleware de API Key (Proteção Server-to-Server)
-router.use(validateApiKey);
-
-// 1. Health Check (A gente deixa antes para não cair em validações de body)
+// ==========================================
+// 1. ROTAS PÚBLICAS (Health Check)
+// Fica ANTES do bloqueio de API Key para testes e monitores baterem livremente
+// ==========================================
 router.get('/health', iaController.checkPythonStatus);
 
-// 2. A Rota Principal Unificada e Blindada
-// Agora tem o Rate Limiter, o Validador do Zod e o nome correto do Controller!
+// ==========================================
+// 2. PROTEÇÃO DE ROTAS (Requer IA_API_KEY)
+// A partir desta linha para baixo, o Express barra quem não tiver a chave
+// ==========================================
+router.use(validateApiKey);
+
+// 3. A Rota Principal Unificada e Blindada
 router.post(
   '/registrar-presenca', 
   iaRateLimiter, 
@@ -22,7 +27,7 @@ router.post(
   iaController.processarReconhecimento
 );
 
-// 3. Validação de rosto para alunos novos
+// 4. Validação de rosto para alunos novos
 router.post('/validar-aluno', iaController.validarAluno);
 
 module.exports = router;
