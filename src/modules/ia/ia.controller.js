@@ -1,7 +1,8 @@
+const axios = require('axios');
 const iaService = require('./ia.service');
 
 class IaController {
-
+  // 1. Monitoramento de Status (Health Check)
   async checkPythonStatus(req, res) {
     try {
       // Ping rápido de 3 segundos para ver se o Python responde
@@ -18,11 +19,13 @@ class IaController {
       });
     }
   }
-  async registrarPresenca(req, res, next) {
+
+  // 2. CORRIGIDO: Nome alterado para bater com o ia.routes.js
+  async processarReconhecimento(req, res, next) {
     try {
       const { alunoId, turmaId, disciplinaId, faceScore } = req.body;
 
-      // Repassa o faceScore recebido do Python para o processamento
+      // Repassa os dados recebidos do Python para o processamento de regras do SENAI
       const resultado = await iaService.processarReconhecimento({ 
         alunoId, 
         turmaId, 
@@ -40,9 +43,9 @@ class IaController {
     }
   }
 
+  // 3. Validação/Onboarding da face
   async validarAluno(req, res, next) {
     try {
-      // Lógica futura para onboarding/cadastro da face
       const resultado = await iaService.validarFaceAluno(req.body);
       return res.status(200).json({ status: 'success', data: resultado });
     } catch (error) {

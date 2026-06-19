@@ -59,6 +59,32 @@ class PresencaController {
       next(error);
     }
   }
+
+  async registrarPresencaManual(req, res, next) {
+    try {
+      // Pega os dados enviados pelo Front-end (Secretaria/Professor)
+      const { alunoId, turmaId, disciplinaId, status, origem } = req.body;
+      
+      const presencaService = require('./presenca.service');
+      
+      const novaPresenca = await presencaService.registrarPresencaManual({
+        alunoId,
+        turmaId,
+        disciplinaId,
+        status: status || 'PRESENTE',
+        origem: origem || 'MANUAL'
+      });
+
+      return res.status(201).json({ 
+        status: 'success', 
+        message: 'Presença manual registrada com sucesso.',
+        data: novaPresenca 
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+  
 }
 
 module.exports = new PresencaController();

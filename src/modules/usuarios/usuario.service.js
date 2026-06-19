@@ -1,7 +1,7 @@
 const usuarioRepository = require('./usuario.repository');
 const auditService = require('../auditoria/audit.service');
 const AppError = require('../../utils/AppError');
-const bcrypt = require('bcrypt'); // Se não tiver instalado, rode: npm install bcrypt
+const bcrypt = require('bcryptjs'); // Se não tiver instalado, rode: npm install bcrypt
 
 class UsuarioService {
   async criarUsuario(data, usuarioLogadoId) {

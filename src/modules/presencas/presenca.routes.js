@@ -16,6 +16,10 @@ router.get('/hoje', presencaController.getHoje);
 router.get('/aluno/:id', presencaController.getByAluno);
 router.get('/turma/:id', presencaController.getByTurma);
 
+
+router.post('/', authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.PROFESSOR]), presencaController.registrarPresencaManual);
+
+
 // Validador de presença manual injetado
 router.post(
   '/:presencaId/justificar', 

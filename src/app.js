@@ -13,6 +13,8 @@ const relatorioRoutes = require('./modules/relatorios/relatorio.routes');
 const appConfig = require('./config/app.config');
 const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
+const usuarioRoutes = require('./modules/usuarios/usuario.routes');
+const horarioRoutes = require('./modules/horarios/horario.routes');
 
 const app = express();
 
@@ -48,6 +50,8 @@ app.use(`${appConfig.apiPrefix}/disciplinas`, disciplinaRoutes);
 app.use(`${appConfig.apiPrefix}/presencas`, presencaRoutes);
 app.use(`${appConfig.apiPrefix}/ia`, iaRoutes);
 app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);
+app.use(`${appConfig.apiPrefix}/usuarios`, usuarioRoutes);
+app.use(`${appConfig.apiPrefix}/horarios`, horarioRoutes);
 // ==========================================
 // TRATAMENTO DE ERROS E ROTAS INEXISTENTES
 // ==========================================

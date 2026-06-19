@@ -211,13 +211,13 @@ model IaLog {
 model Alerta {
   id        String   @id @default(uuid())
   alunoId   String   @map("aluno_id")
-  turmaId   String   @map("turma_id")
+  turmaId   String?  @map("turma_id") // <--- ADICIONE A INTERROGAÇÃO AQUI
   mensagem  String
   resolvido Boolean  @default(false)
   criadoEm  DateTime @default(now()) @map("criado_em")
 
   aluno     Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  turma     Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  turma     Turma?   @relation(fields: [turmaId], references: [id], onDelete: Cascade) // <--- E AQUI
 
   @@map("alertas")
 }

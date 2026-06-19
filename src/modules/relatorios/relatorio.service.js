@@ -55,27 +55,67 @@ class RelatorioService {
 
   // 3. Alunos com Baixa Frequência (Filtro Global)
   async listarAlunosBaixaFrequencia(limiar = 75, dataInicio, dataFim) {
-    // Pega todos os alunos ativos
-    const alunos = await prisma.aluno.findMany({ where: { ativo: true } });
+    const whereClause = {};
+    if (dataInicio || dataFim) {
+      whereClause.dataHora = {};
+      if (dataInicio) whereClause.dataHora.gte = new Date(dataInicio);
+      if (dataFim) whereClause.dataHora.lte = new Date(dataFim);
+    }
+
+    // 1 QUERY APENAS: Traz a contagem de faltas/presenças de TODOS os alunos de uma vez
+    const contagens = await prisma.presenca.groupBy({
+      by: ['alunoId', 'status'],
+      where: whereClause,
+      _count: { _all: true }
+    });
+
+    // 1 QUERY APENAS: Traz os dados básicos dos alunos ativos
+    const alunos = await prisma.aluno.findMany({ 
+      where: { ativo: true }, 
+      select: { id: true, nome: true, matricula: true } 
+    });
+
+    const mapaFrequencia = {};
+    alunos.forEach(a => {
+      mapaFrequencia[a.id] = { ...a, presentes: 0, ausentes: 0, justificados: 0, atrasos: 0, saidasAntecipadas: 0 };
+    });
+
+    // Distribui as contagens do banco na memória do Node (Muito mais rápido!)
+    contagens.forEach(item => {
+      if (mapaFrequencia[item.alunoId]) {
+        const status = item.status;
+        const qtd = item._count._all;
+        if (status === 'PRESENTE') mapaFrequencia[item.alunoId].presentes = qtd;
+        if (status === 'AUSENTE') mapaFrequencia[item.alunoId].ausentes = qtd;
+        if (status === 'JUSTIFICADO') mapaFrequencia[item.alunoId].justificados = qtd;
+        if (status === 'ATRASO') mapaFrequencia[item.alunoId].atrasos = qtd;
+        if (status === 'SAIDA_ANTECIPADA') mapaFrequencia[item.alunoId].saidasAntecipadas = qtd;
+      }
+    });
+
     const alunosEmRisco = [];
 
-    // Para cada aluno, calcula a frequência no período usando nosso motor pronto
-    for (const aluno of alunos) {
-      const relatorio = await alunoService.calcularFrequenciaPercentual(aluno.id, dataInicio, dataFim);
-      
-      // Se a frequência for menor que o limiar (ex: 75), entra pra lista vermelha
-      if (relatorio.frequenciaPercentual < Number(limiar)) {
+    // Calcula a porcentagem sem bater no banco de dados
+    for (const alunoId in mapaFrequencia) {
+      const dados = mapaFrequencia[alunoId];
+      const total = dados.presentes + dados.ausentes + dados.justificados + dados.atrasos + dados.saidasAntecipadas;
+      let frequencia = 100.0;
+
+      if (total > 0) {
+        frequencia = ((dados.presentes + dados.justificados + dados.atrasos + dados.saidasAntecipadas) / total) * 100;
+      }
+
+      if (frequencia < Number(limiar)) {
         alunosEmRisco.push({
-          alunoId: aluno.id,
-          nome: aluno.nome,
-          matricula: aluno.matricula,
-          frequencia: relatorio.frequenciaPercentual,
-          statusRisco: relatorio.statusRisco
+          alunoId,
+          nome: dados.nome,
+          matricula: dados.matricula,
+          frequencia: Number(frequencia.toFixed(2)),
+          statusRisco: 'EM_RISCO'
         });
       }
     }
 
-    // Ordena dos mais faltosos para os menos faltosos
     return alunosEmRisco.sort((a, b) => a.frequencia - b.frequencia);
   }
 }

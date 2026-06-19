@@ -7,12 +7,22 @@ const { registrarPresencaIaSchema } = require('../../validators/ia.validator');
 
 const router = Router();
 
-// Middleware de API Key (Proteção Sever-to-Server)
+// Middleware de API Key (Proteção Server-to-Server)
 router.use(validateApiKey);
 
-// Rota interceptada pelo Zod para sanitizar os dados do Python
-router.post('/registrar-presenca', validate(registrarPresencaIaSchema), iaController.registrarPresenca);
-router.post('/validar-aluno', iaController.validarAluno);
+// 1. Health Check (A gente deixa antes para não cair em validações de body)
 router.get('/health', iaController.checkPythonStatus);
-router.post('/reconhecer', iaRateLimiter, iaController.processarReconhecimento);
+
+// 2. A Rota Principal Unificada e Blindada
+// Agora tem o Rate Limiter, o Validador do Zod e o nome correto do Controller!
+router.post(
+  '/registrar-presenca', 
+  iaRateLimiter, 
+  validate(registrarPresencaIaSchema), 
+  iaController.processarReconhecimento
+);
+
+// 3. Validação de rosto para alunos novos
+router.post('/validar-aluno', iaController.validarAluno);
+
 module.exports = router;

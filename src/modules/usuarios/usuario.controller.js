@@ -3,8 +3,8 @@ const usuarioService = require('./usuario.service');
 class UsuarioController {
   async create(req, res, next) {
     try {
-      // req.user.id vem do seu middleware de autenticação (JWT)
-      const novoUsuario = await usuarioService.criarUsuario(req.body, req.user.id);
+      // req.usuario.id vem do seu middleware de autenticação (JWT)
+      const novoUsuario = await usuarioService.criarUsuario(req.body, req.usuario.id);
       return res.status(201).json({ status: 'success', data: novoUsuario });
     } catch (error) {
       next(error);

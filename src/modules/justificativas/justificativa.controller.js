@@ -7,7 +7,7 @@ class JustificativaController {
       const presencaId = req.params.presencaId;
       const { motivo, anexoUrl } = req.body;
       
-      const usuarioLogadoId = req.user.id; // Pegando do token JWT
+      const usuarioLogadoId = req.usuario.id; // Pegando do token JWT
 
       const resultado = await justificativaService.registrarJustificativa(
         { presencaId, motivo, anexoUrl }, 

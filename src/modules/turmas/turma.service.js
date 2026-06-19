@@ -1,5 +1,6 @@
 const turmaRepository = require('./turma.repository');
 const auditService = require('../auditoria/audit.service'); // <-- Importamos o gravador
+const presencaRepository = require('../presencas/presenca.repository');
 const AppError = require('../../utils/AppError');
 
 class TurmaService {

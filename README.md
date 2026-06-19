@@ -99,3 +99,28 @@ Módulos disponíveis:
 /ia - Rotas blindadas por API Key para o backend Python.
 
 /relatorios - Endpoints consolidados para os Dashboards (Cozinha, Secretaria, etc).
+
+## 🧩 Módulos e Endpoints Principais (13 Módulos)
+
+O ecossistema é dividido em 13 módulos focados em responsabilidade única:
+1.  **Auth (`/auth`)**: Login, Logout, Refresh Token.
+2.  **Usuários (`/usuarios`)**: RBAC (Admin, Secretaria, Cozinha).
+3.  **Alunos (`/alunos`)**: Cadastro e histórico de frequência matricial.
+4.  **Turmas (`/turmas`)**: Agrupamento de alunos e turnos.
+5.  **Disciplinas (`/disciplinas`)**: Grade curricular.
+6.  **Horários (`/horarios`)**: Configuração da grade por dia da semana e validação de atrasos.
+7.  **Presenças (`/presencas`)**: Core system (Facial, Manual, Cron Job).
+8.  **Justificativas**: Upload de atestados médicos vinculados à presença.
+9.  **Relatórios (`/relatorios`)**: Dashboard gerencial, CSVs e previsão de cozinha.
+10. **Inteligência Artificial (`/ia`)**: Comunicação Server-to-Server com Python, Circuit Breaker e Log de Impostores.
+11. **Alertas (`/alertas`)**: Sistema preventivo de evasão escolar.
+12. **Auditoria (`/audit`)**: Caixa-preta padrão LGPD.
+13. **Cron Jobs**: Automações noturnas (Faltas, E-mails, Backups de DB).
+
+---
+
+##  Decisões Arquiteturais e Trade-offs
+
+* **Blacklist de JWT em Memória vs Redis:**
+  Optamos por utilizar um `Set` em memória nativa do Node.js (`global.tokenBlacklist`) para o MVP escolar visando reduzir a fricção de infraestrutura e custos operacionais de deploy local no SENAI. 
+  * *Roadmap de Escala:* Em um ambiente de produção distribuído (com Múltiplas Instâncias/Cluster), a blacklist atual será substituída por um banco chave-valor **Redis**, garantindo o estado compartilhado das sessões derrubadas.
