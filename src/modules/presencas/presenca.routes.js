@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const presencaController = require('./presenca.controller');
-const justificativaController = require('../justificativas/justificativa.controller'); // <-- FALTAVA ESSA IMPORTAÇÃO!
+const justificativaController = require('../justificativas/justificativa.controller'); 
 const authenticate = require('../../middlewares/authenticate');
 const authorize = require('../../middlewares/authorize');
 const validate = require('../../middlewares/validate');
@@ -16,11 +16,20 @@ router.get('/hoje', presencaController.getHoje);
 router.get('/aluno/:id', presencaController.getByAluno);
 router.get('/turma/:id', presencaController.getByTurma);
 
+// ROTA MANUAL (Com validador Zod injetado)
+router.post('/', 
+  authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.PROFESSOR]), 
+  validate(registrarPresencaSchema), 
+  presencaController.registrarPresencaManual
+);
 
-router.post('/', authorize([ROLES.ADMIN, ROLES.SECRETARIA, ROLES.PROFESSOR]), presencaController.registrarPresencaManual);
+// ----------------------------------------------------
+// 🔥 AS DUAS ROTAS NOVAS AQUI! (Sync e Saída)
+// ----------------------------------------------------
+router.post('/batch', authorize([ROLES.ADMIN, ROLES.PROFESSOR]), presencaController.sincronizarBatch);
+router.patch('/:id/saida', authorize([ROLES.ADMIN, ROLES.SECRETARIA]), presencaController.registrarSaida);
 
-
-// Validador de presença manual injetado
+// Justificativa
 router.post(
   '/:presencaId/justificar', 
   authorize([ROLES.ADMIN, ROLES.SECRETARIA]), 

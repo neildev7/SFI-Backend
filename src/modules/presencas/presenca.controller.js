@@ -84,7 +84,64 @@ class PresencaController {
       next(error);
     }
   }
-  
+
+  // Sincronização em Lote (Offline Sync para o Flutter)
+  async sincronizarBatch(req, res, next) {
+    try {
+      const { presencas } = req.body; // O Flutter envia um array de presenças
+      
+      if (!presencas || !Array.isArray(presencas)) {
+        return res.status(400).json({ error: 'Formato inválido. Esperado um array de presencas.' });
+      }
+
+      const prisma = require('../../database/client');
+      
+      // Insere todas as presenças de uma vezada só no banco
+      const resultado = await prisma.presenca.createMany({
+        data: presencas.map(p => ({
+          alunoId: p.alunoId,
+          turmaId: p.turmaId,
+          disciplinaId: p.disciplinaId,
+          status: p.status || 'PRESENTE',
+          horarioEntrada: p.horarioEntrada ? new Date(p.horarioEntrada) : new Date(),
+          origem: 'FLUTTER_OFFLINE'
+        })),
+        skipDuplicates: true // Evita quebrar se o app mandar a mesma presença duas vezes
+      });
+
+      return res.status(201).json({ 
+        status: 'success', 
+        message: `${resultado.count} presenças sincronizadas com sucesso.` 
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Registrar Saída (Saída Antecipada)
+  async registrarSaida(req, res, next) {
+    try {
+      const { id } = req.params;
+      const prisma = require('../../database/client');
+
+      const presencaAtualizada = await prisma.presenca.update({
+        where: { id },
+        data: {
+          horarioSaida: new Date(),
+          status: 'SAIDA_ANTECIPADA' // Atualiza o status automaticamente
+        }
+      });
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Saída registrada com sucesso.',
+        data: presencaAtualizada
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 module.exports = new PresencaController();

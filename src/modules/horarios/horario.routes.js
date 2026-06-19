@@ -6,6 +6,9 @@ const router = Router();
 
 router.use(authenticate);
 
+
+router.get('/turma/:id/agora', horarioController.buscarAulaAtual);
+
 router.post('/', horarioController.create);
 router.get('/', horarioController.getAll);
 
