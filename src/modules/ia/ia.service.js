@@ -24,8 +24,8 @@ class IaService {
 
     const aluno = await alunoService.buscarAlunoPorId(alunoId);
     const scoreFormatado = faceScore ? (faceScore * 100).toFixed(1) : '0.0';
-    
-    // 1. Validação de Limiar de Confiança (Se falhar, gera log de REJEITADO)
+
+    // 1. Validação de Limiar de Confiança (mantido igual)
     if (faceScore !== undefined && faceScore !== null && faceScore < THRESHOLD_CONFIANCA_IA) {
       await prisma.iaLog.create({
         data: {
@@ -40,25 +40,20 @@ class IaService {
       throw new AppError(`Reconhecimento rejeitado. Baixa confiança (${scoreFormatado}%).`, 422);
     }
 
-    // 2. Descobre a aula atual conforme a grade horária
-    const { disciplinaId, statusCalculado } = await horarioService.validarEObterDisciplinaAtual(turmaId);
+    // 2. Já existe presença HOJE pra esse aluno nessa turma? (dia inteiro, sem disciplina)
+    const presencaHoje = await presencaRepository.buscarPresencaCompletaDeHoje(alunoId, turmaId);
 
-    // 3. Regra de Deduplicação e Registro de Saída
-    const presencaHoje = await presencaRepository.buscarPresencaDeHojePorDisciplina(alunoId, turmaId, disciplinaId);
-
+    // 3. Já tem entrada hoje -> este scan é SAÍDA
     if (presencaHoje) {
       if (!presencaHoje.dataHoraSaida) {
-        const statusSaida = await horarioService.validarStatusSaida(turmaId, disciplinaId);
-        
-        // ----------------------------------------------------------------
-        // 🔥 TRANSAÇÃO ATÔMICA DA SAÍDA (Ou grava tudo, ou dá rollback)
-        // ----------------------------------------------------------------
-        const [saidaRegistrada, logSaida] = await prisma.$transaction([
+        const statusSaida = await horarioService.validarStatusSaidaDia(turmaId);
+
+        const [saidaRegistrada] = await prisma.$transaction([
           prisma.presenca.update({
             where: { id: presencaHoje.id },
             data: {
               dataHoraSaida: new Date(),
-              status: statusSaida // Muda para SAIDA_ANTECIPADA se necessário
+              status: statusSaida || presencaHoje.status
             }
           }),
           prisma.iaLog.create({
@@ -68,7 +63,7 @@ class IaService {
               faceScore,
               imagemHash: imagemHash || null,
               resultado: 'ACEITO',
-              motivo: statusSaida === 'SAIDA_ANTECIPADA' ? 'Saída antecipada registrada.' : 'Saída normal registrada.'
+              motivo: statusSaida === 'SAIDA_ANTECIPADA' ? 'Saída antecipada registrada.' : 'Saída registrada.'
             }
           })
         ]);
@@ -78,34 +73,28 @@ class IaService {
           status: statusSaida === 'SAIDA_ANTECIPADA' ? 'SAIDA_ANTECIPADA_REGISTRADA' : 'SAIDA_REGISTRADA',
           presenca: saidaRegistrada
         };
-      } else {
-        return {
-          aluno: aluno.nome,
-          status: 'IGNORADO',
-          mensagem: 'O ciclo desta disciplina já foi concluído hoje.'
-        };
       }
+
+      // 4. Já tem entrada E já tem saída -> ciclo do dia já foi concluído
+      return {
+        aluno: aluno.nome,
+        status: 'IGNORADO',
+        mensagem: `${aluno.nome} já concluiu o ciclo de presença hoje.`
+      };
     }
 
-    // ----------------------------------------------------------------
-    // 🔥 TRANSAÇÃO ATÔMICA DA ENTRADA (A exigência do Claude resolvida)
-    // ----------------------------------------------------------------
-    const [novaPresenca, novoLogIa] = await prisma.$transaction([
-      
-      // 1. Cria a Presença diretamente pelo Prisma para garantir a transação
+    // 5. Primeiro scan do dia -> ENTRADA (presente em todas as aulas)
+    const [novaPresenca] = await prisma.$transaction([
       prisma.presenca.create({
         data: {
           alunoId: aluno.id,
           turmaId: turmaId,
-          disciplinaId: disciplinaId,
-          status: statusCalculado,
+          status: 'PRESENTE',
           origem: 'FACIAL',
           faceScore: faceScore || null,
           dataHora: new Date()
         }
       }),
-
-      // 2. Cria a Auditoria da LGPD na mesma tacada
       prisma.iaLog.create({
         data: {
           alunoId: aluno.id,
@@ -113,7 +102,7 @@ class IaService {
           faceScore,
           imagemHash: imagemHash || null,
           resultado: 'ACEITO',
-          motivo: `Entrada registrada com status: ${statusCalculado}.`
+          motivo: 'Entrada registrada (presença do dia inteiro).'
         }
       })
     ]);

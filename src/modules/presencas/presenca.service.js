@@ -82,7 +82,7 @@ class PresencaService {
         const alunoId = vinculo.alunoId;
 
         // 4. Verifica se o aluno teve presença (ou falta justificada) nessa aula hoje
-        const presencaHoje = await presencaRepository.buscarPresencaDeHojePorDisciplina(alunoId, turmaId, disciplinaId);
+        const presencaHoje = await presencaRepository.buscarPresencaCompletaDeHoje(alunoId, turmaId);
 
         // 5. Se NÃO tem registro nenhum, ele faltou! A canetada acontece aqui.
         if (!presencaHoje) {

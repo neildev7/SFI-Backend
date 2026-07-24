@@ -22,26 +22,20 @@ class IaController {
 
   // 2. CORRIGIDO: Nome alterado para bater com o ia.routes.js
   async processarReconhecimento(req, res, next) {
-    try {
-      const { alunoId, turmaId, disciplinaId, faceScore } = req.body;
+  try {
+    const { alunoId, turmaId, faceScore } = req.body;
 
-      // Repassa os dados recebidos do Python para o processamento de regras do SENAI
-      const resultado = await iaService.processarReconhecimento({ 
-        alunoId, 
-        turmaId, 
-        disciplinaId, 
-        faceScore 
-      });
+    const resultado = await iaService.processarReconhecimento({ alunoId, turmaId, faceScore });
 
-      return res.status(201).json({ 
-        status: 'success', 
-        message: 'Presença registrada com sucesso pela IA.',
-        data: resultado 
-      });
-    } catch (error) {
-      next(error);
-    }
+    return res.status(201).json({
+      status: 'success',
+      message: 'Presença registrada com sucesso pela IA.',
+      data: resultado
+    });
+  } catch (error) {
+    next(error);
   }
+}
 
   // 3. Validação/Onboarding da face
   async validarAluno(req, res, next) {

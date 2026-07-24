@@ -86,6 +86,39 @@ class HorarioService {
 
     return null; // Saída normal, mantém o status de PRESENTE/ATRASO que já tinha
   }
+
+  // Verifica se a saída está acontecendo antes do fim da ÚLTIMA aula do dia (modelo dia inteiro)
+  async validarStatusSaidaDia(turmaId) {
+    const agora = dayjs();
+    const horaAtualStr = agora.format('HH:mm');
+
+    const diasSemanaMap = ['DOMINGO', 'SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'];
+    const diaAtualEnum = diasSemanaMap[agora.day()];
+
+    const gradeDoDia = await horarioRepository.findByTurmaEDia(turmaId, diaAtualEnum);
+
+    if (!gradeDoDia || gradeDoDia.length === 0) {
+      // Sem grade cadastrada pra hoje: não dá pra avaliar, trata como saída normal
+      return null;
+    }
+
+    const fimDaUltimaAula = gradeDoDia.reduce(
+      (maisTarde, horario) => (horario.horaFim > maisTarde ? horario.horaFim : maisTarde),
+      '00:00'
+    );
+
+    const limiteSaidaNormal = dayjs()
+      .hour(fimDaUltimaAula.split(':')[0])
+      .minute(fimDaUltimaAula.split(':')[1])
+      .subtract(10, 'minute')
+      .format('HH:mm');
+
+    if (horaAtualStr < limiteSaidaNormal) {
+      return 'SAIDA_ANTECIPADA';
+    }
+
+    return null;
+  }
 }
 
 module.exports = new HorarioService();
