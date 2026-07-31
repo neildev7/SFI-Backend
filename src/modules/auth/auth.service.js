@@ -20,10 +20,28 @@ class AuthService {
   }
 
   async login(email, senha) {
-    const usuario = await prisma.usuario.findUnique({ where: { email } });
+    const prisma = require('../../database/client');
+    const bcrypt = require('bcryptjs');
+    const authConfig = require('../../config/auth.config');
+    const jwt = require('jsonwebtoken');
+    const AppError = require('../../utils/AppError');
 
+    const usuario = await prisma.usuario.findUnique({ where: { email } });
+    
     if (!usuario) {
-      throw new AppError('E-mail ou senha incorretos.', 401);
+      throw new AppError('Credenciais inválidas.', 401);
+    }
+
+    // ==========================================
+    // A TRAVA DE SEGURANÇA QUE FALTAVA AQUI!
+    // ==========================================
+    if (!usuario.ativo) {
+      throw new AppError('Esta conta foi desativada. Procure a administração.', 403); // 403 = Forbidden
+    }
+
+    const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    if (!senhaValida) {
+      throw new AppError('Credenciais inválidas.', 401);
     }
 
     const senhaCorreta = await bcrypt.compare(senha, usuario.senha);

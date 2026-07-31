@@ -27,7 +27,6 @@ router.post(
   iaController.processarReconhecimento
 );
 
-// 4. Validação de rosto para alunos novos
-router.post('/validar-aluno', iaController.validarAluno);
+
 
 module.exports = router;

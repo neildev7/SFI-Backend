@@ -11,6 +11,56 @@ class HorarioService {
     return await horarioRepository.findAll();
   }
 
+  // Adicione isso na classe HorarioService
+  async atualizarHorario(id, data, usuarioLogadoId) {
+    const horarioRepository = require('./horario.repository');
+    const auditService = require('../auditoria/audit.service');
+    const AppError = require('../../utils/AppError');
+
+    const horarioAntigo = await horarioRepository.findById(id);
+    if (!horarioAntigo) {
+      throw new AppError('Horário não encontrado.', 404);
+    }
+
+    const horarioAtualizado = await horarioRepository.update(id, data);
+
+    // LGPD - Rastreador de quem mexeu na grade de aulas
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'UPDATE',
+      entidade: 'Horario',
+      entidadeId: id,
+      dadosAntigos: horarioAntigo,
+      dadosNovos: horarioAtualizado
+    });
+
+    return horarioAtualizado;
+  }
+
+  async deletarHorario(id, usuarioLogadoId) {
+    const horarioRepository = require('./horario.repository');
+    const auditService = require('../auditoria/audit.service');
+    const AppError = require('../../utils/AppError');
+
+    const horarioAntigo = await horarioRepository.findById(id);
+    if (!horarioAntigo) {
+      throw new AppError('Horário não encontrado.', 404);
+    }
+
+    const horarioDeletado = await horarioRepository.delete(id);
+
+    // LGPD
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'DELETE',
+      entidade: 'Horario',
+      entidadeId: id,
+      dadosAntigos: horarioAntigo
+    });
+
+    return horarioDeletado;
+  }
+
   // O CORAÇÃO DA VALIDAÇÃO: Descobre qual aula está acontecendo AGORA
   async validarEObterDisciplinaAtual(turmaId) {
     const agora = dayjs();

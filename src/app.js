@@ -15,6 +15,9 @@ const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
 const usuarioRoutes = require('./modules/usuarios/usuario.routes');
 const horarioRoutes = require('./modules/horarios/horario.routes');
+const alertaRoutes = require('./modules/alertas/alerta.routes');
+const auditoriaRoutes = require('./modules/auditoria/auditoria.routes');
+const justificativaRoutes = require('./modules/justificativas/justificativa.routes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 
@@ -55,6 +58,9 @@ app.use(`${appConfig.apiPrefix}/ia`, iaRoutes);
 app.use(`${appConfig.apiPrefix}/relatorios`, relatorioRoutes);
 app.use(`${appConfig.apiPrefix}/usuarios`, usuarioRoutes);
 app.use(`${appConfig.apiPrefix}/horarios`, horarioRoutes);
+app.use(`${appConfig.apiPrefix}/alertas`, alertaRoutes);
+app.use(`${appConfig.apiPrefix}/auditoria`, auditoriaRoutes);
+app.use(`${appConfig.apiPrefix}/justificativas`, justificativaRoutes);
 // ==========================================
 // TRATAMENTO DE ERROS E ROTAS INEXISTENTES
 // ==========================================

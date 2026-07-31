@@ -46,6 +46,18 @@ class JustificativaService {
 
     return { justificativa: novaJustificativa, presenca: presencaAtualizada };
   }
+
+  async listarPendentes() {
+    const prisma = require('../../database/client');
+    return await prisma.justificativa.findMany({
+      where: { status: 'PENDENTE' },
+      include: { 
+        presenca: { include: { aluno: true } } // Traz o nome do aluno junto pra ficar top no Front
+      },
+      orderBy: { dataCriacao: 'desc' }
+    });
+  }
+  
 }
 
 module.exports = new JustificativaService();

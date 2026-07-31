@@ -10,6 +10,34 @@ class HorarioController {
     }
   }
 
+  // Adicione na classe HorarioController
+  async update(req, res, next) {
+    try {
+      const horarioService = require('./horario.service');
+      const horarioAtualizado = await horarioService.atualizarHorario(
+        req.params.id, 
+        req.body, 
+        req.usuario.id // Injetando quem alterou para o log
+      );
+      return res.status(200).json({ status: 'success', data: horarioAtualizado });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req, res, next) {
+    try {
+      const horarioService = require('./horario.service');
+      await horarioService.deletarHorario(
+        req.params.id, 
+        req.usuario.id // Injetando quem apagou para o log
+      );
+      return res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAll(req, res, next) {
     try {
       const horarios = await horarioService.listarTodos();

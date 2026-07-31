@@ -37,6 +37,42 @@ class UsuarioService {
     return await usuarioRepository.findAll();
   }
 
+  // Adicione isso na classe UsuarioService
+  async atualizarUsuario(id, data, usuarioLogadoId) {
+    const usuarioRepository = require('./usuario.repository');
+    const auditService = require('../auditoria/audit.service');
+    const AppError = require('../../utils/AppError');
+
+    // 1. Garante que o usuário que queremos editar existe
+    const usuarioAntigo = await usuarioRepository.findById(id);
+    if (!usuarioAntigo) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    // 2. Se tentarem mudar o e-mail, verifica se já não tem outro igual
+    if (data.email && data.email !== usuarioAntigo.email) {
+      const emailEmUso = await usuarioRepository.findByEmail(data.email);
+      if (emailEmUso) {
+        throw new AppError('Este e-mail já está em uso por outro usuário.', 400);
+      }
+    }
+
+    // 3. Atualiza no banco
+    const usuarioAtualizado = await usuarioRepository.update(id, data);
+
+    // 4. Registra na Auditoria (LGPD) - Quem demitiu/editou quem?
+    auditService.registrarLog({
+      usuarioId: usuarioLogadoId,
+      acao: 'UPDATE',
+      entidade: 'Usuario',
+      entidadeId: id,
+      dadosAntigos: { nome: usuarioAntigo.nome, ativo: usuarioAntigo.ativo, cargo: usuarioAntigo.cargo },
+      dadosNovos: { nome: usuarioAtualizado.nome, ativo: usuarioAtualizado.ativo, cargo: usuarioAtualizado.cargo }
+    });
+
+    return usuarioAtualizado;
+  }
+
 }
 
 module.exports = new UsuarioService();

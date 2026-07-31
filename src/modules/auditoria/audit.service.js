@@ -21,6 +21,16 @@ class AuditService {
       console.error('🚨 [AUDITORIA] Falha ao registrar AuditLog:', error.message);
     }
   }
+
+  async listarLogs(filtros = {}) {
+    const prisma = require('../../database/client');
+    return await prisma.auditLog.findMany({
+      where: filtros,
+      orderBy: { dataHora: 'desc' },
+      take: 100 // Limite seguro para não explodir o banco
+    });
+  }
+  
 }
 
 module.exports = new AuditService();

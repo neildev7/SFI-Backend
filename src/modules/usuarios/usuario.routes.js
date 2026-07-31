@@ -14,5 +14,10 @@ router.use(authorize([ROLES.ADMIN]));
 
 router.post('/', validate(createUsuarioSchema), usuarioController.create);
 router.get('/', usuarioController.getAll);
+router.patch(
+  '/:id', 
+  authorize([ROLES.ADMIN]), 
+  usuarioController.update
+);
 
 module.exports = router;

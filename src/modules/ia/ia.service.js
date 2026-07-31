@@ -1,4 +1,3 @@
-const axios = require('axios');
 const alunoService = require('../alunos/aluno.service');
 const horarioService = require('../horarios/horario.service');
 const presencaRepository = require('../presencas/presenca.repository');
@@ -7,17 +6,6 @@ const prisma = require('../../database/client');
 
 const THRESHOLD_CONFIANCA_IA = Number(process.env.IA_MIN_CONFIDENCE_SCORE) || 0.85;
 
-// Configuração do Circuit Breaker Manual
-let circuitAberto = false;
-let falhasSeguidas = 0;
-let tempoRecuperacaoCircuit = null;
-
-const pythonClient = axios.create({
-  baseURL: process.env.PYTHON_API_URL || 'http://localhost:5000',
-  timeout: 5000, 
-  headers: { 'Authorization': `Bearer ${process.env.IA_API_KEY}` }
-});
-
 class IaService {
   async processarReconhecimento(data) {
     const { alunoId, turmaId, faceScore, imagemHash } = data;
@@ -25,7 +13,7 @@ class IaService {
     const aluno = await alunoService.buscarAlunoPorId(alunoId);
     const scoreFormatado = faceScore ? (faceScore * 100).toFixed(1) : '0.0';
 
-    // 1. Validação de Limiar de Confiança (mantido igual)
+    // 1. Validação de Limiar de Confiança
     if (faceScore !== undefined && faceScore !== null && faceScore < THRESHOLD_CONFIANCA_IA) {
       await prisma.iaLog.create({
         data: {
@@ -112,43 +100,6 @@ class IaService {
       status: 'ENTRADA_REGISTRADA',
       presenca: novaPresenca
     };
-  }
-
-  // 5. Envio de foto pro Python com Retry, Backoff e CIRCUIT BREAKER!
-  async validarFaceAluno(arquivoImagem) {
-    if (circuitAberto) {
-      if (Date.now() > tempoRecuperacaoCircuit) {
-        circuitAberto = false;
-        falhasSeguidas = 0;
-      } else {
-        throw new AppError('O serviço de IA está temporariamente fora do ar (Circuit Breaker Ativo). Tente novamente em instantes.', 503);
-      }
-    }
-
-    let tentativas = 0;
-    const maxTentativas = 3;
-
-    while (tentativas < maxTentativas) {
-      try {
-        const response = await pythonClient.post('/reconhecer', { imagem: arquivoImagem });
-        falhasSeguidas = 0;
-        return response.data;
-      } catch (error) {
-        tentativas++;
-        console.error(`🚨 Erro de comunicação com a IA Python (Tentativa ${tentativas}/${maxTentativas})`);
-
-        if (tentativas >= maxTentativas) {
-          falhasSeguidas++;
-          if (falhasSeguidas >= 5) {
-            circuitAberto = true;
-            tempoRecuperacaoCircuit = Date.now() + 30000;
-            console.error('🚨 [CIRCUIT BREAKER] Circuito aberto! Protegendo o servidor Node de sobrecarga.');
-          }
-          throw new AppError('Falha crítica de comunicação com o microsserviço de IA.', 503);
-        }
-        await new Promise(resolve => setTimeout(resolve, tentativas * 1000));
-      }
-    }
   }
 }
 

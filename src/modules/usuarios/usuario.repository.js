@@ -28,10 +28,17 @@ class UsuarioRepository {
   }
 
   async update(id, data) {
+    const prisma = require('../../database/client');
+    
+    // Se por acaso vier uma senha nova no payload, faz o hash antes de salvar
+    if (data.senha) {
+      const bcrypt = require('bcryptjs');
+      data.senha = await bcrypt.hash(data.senha, 10);
+    }
+
     return await prisma.usuario.update({
       where: { id },
-      data,
-      select: { id: true, nome: true, email: true, role: true, ativo: true }
+      data
     });
   }
 

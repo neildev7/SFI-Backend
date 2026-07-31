@@ -37,15 +37,6 @@ class IaController {
   }
 }
 
-  // 3. Validação/Onboarding da face
-  async validarAluno(req, res, next) {
-    try {
-      const resultado = await iaService.validarFaceAluno(req.body);
-      return res.status(200).json({ status: 'success', data: resultado });
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 
 module.exports = new IaController();

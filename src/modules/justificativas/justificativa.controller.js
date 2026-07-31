@@ -19,6 +19,16 @@ class JustificativaController {
       next(error);
     }
   }
+
+  async listar(req, res, next) {
+    try {
+      const justificativaService = require('./justificativa.service');
+      const pendentes = await justificativaService.listarPendentes();
+      return res.status(200).json({ status: 'success', data: pendentes });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new JustificativaController();
