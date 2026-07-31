@@ -2,18 +2,27 @@ const AppError = require('../utils/AppError');
 
 const validate = (schema) => (req, res, next) => {
   try {
-    // O Zod verifica se o req.body, req.query e req.params estão corretos
-    schema.parse({
-      body: req.body,
-      query: req.query,
-      params: req.params,
-    });
-
-    next(); // Passou na validação, pode ir para o Controller!
+    schema.parse(req.body);
+    next();
   } catch (error) {
-    // Se o Zod barrar, formatamos as mensagens de erro de forma amigável
-    const mensagensErro = error.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ');
-    next(new AppError(`Erro de Validação: ${mensagensErro}`, 400));
+    // Verifica se o erro veio da validação do Zod (se possui issues)
+    if (error.issues) {
+      // O PULO DO GATO: Agora usamos error.issues no lugar de error.errors
+      const mensagensErro = error.issues.map((issue) => {
+        // Junta o caminho do campo (ex: 'aluno.nome') com a mensagem de erro
+        const campo = issue.path.length > 0 ? `${issue.path.join('.')} - ` : '';
+        return `${campo}${issue.message}`;
+      });
+
+      return res.status(400).json({
+        status: 'error',
+        message: 'Falha na validação dos dados enviados.',
+        erros: mensagensErro
+      });
+    }
+    
+    // Se não for um erro do Zod, repassa para o errorHandler global (Erro 500 real)
+    next(error);
   }
 };
 

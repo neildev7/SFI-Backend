@@ -100,6 +100,30 @@ class PresencaService {
 
     console.log(`🤖 [CRON JOB] Varredura concluída. ${faltasRegistradas} faltas registradas.`);
   }
+
+  // ==========================================
+  // REGISTRO DE SAÍDA (O método correto)
+  // ==========================================
+  async registrarSaida(presencaId, novoStatus) {
+    const presencaRepository = require('./presenca.repository');
+    const AppError = require('../../utils/AppError');
+
+    // 1. Garante que a presença existe
+    const presenca = await presencaRepository.buscarPorId(presencaId);
+    if (!presenca) {
+      throw new AppError('Registro de presença não encontrado.', 404);
+    }
+
+    // 2. Evita sobrescrever uma saída que já foi dada
+    if (presenca.dataHoraSaida) {
+      throw new AppError('A saída já foi registrada para este aluno.', 400);
+    }
+
+    // 3. Chama o método do Repository que nós já tínhamos criado (e esquecido de usar!)
+    const presencaAtualizada = await presencaRepository.registrarSaida(presencaId, novoStatus);
+
+    return presencaAtualizada;
+  }
 }
 
 module.exports = new PresencaService();

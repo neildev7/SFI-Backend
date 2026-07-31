@@ -193,6 +193,64 @@ class PresencaRepository {
       _count: { _all: true }
     });
   }
+  // ==========================================
+  // SYNC OFFLINE (A PROVA DE DUPLICIDADE)
+  // ==========================================
+  async sincronizarBatchOffline(lotePresencas) {
+    const prisma = require('../../database/client');
+    const resultados = { inseridos: 0, ignorados: 0, erros: 0 };
+
+    for (const item of lotePresencas) {
+      try {
+        // Pega a data exata em que a falta/presença foi gerada lá no tablet offline
+        const dataRegistro = item.dataHora ? new Date(item.dataHora) : new Date();
+        
+        // Define começo e fim daquele dia específico para buscar duplicatas
+        const diaInicio = new Date(dataRegistro);
+        diaInicio.setHours(0, 0, 0, 0);
+        const diaFim = new Date(dataRegistro);
+        diaFim.setHours(23, 59, 59, 999);
+
+        // A TRAVA DE DUPLICIDADE (O que o Claude pediu!)
+        const duplicado = await prisma.presenca.findFirst({
+          where: {
+            alunoId: item.alunoId,
+            turmaId: item.turmaId,
+            disciplinaId: item.disciplinaId || null,
+            dataHora: {
+              gte: diaInicio,
+              lte: diaFim
+            }
+          }
+        });
+
+        if (duplicado) {
+          resultados.ignorados++;
+          continue; // Pula para o próximo registro do lote!
+        }
+
+        // Se passou pela trava, a gente salva com as nomenclaturas corretas
+        await prisma.presenca.create({
+          data: {
+            alunoId: item.alunoId,
+            turmaId: item.turmaId,
+            disciplinaId: item.disciplinaId || null,
+            status: item.status || 'PRESENTE',
+            origem: 'OFFLINE', // O nosso novo Enum!
+            dataHora: dataRegistro, // O nome correto que estava dando pau
+            faceScore: item.faceScore || null
+          }
+        });
+        
+        resultados.inseridos++;
+      } catch (err) {
+        console.error(`Erro ao sincronizar item offline do aluno ${item.alunoId}:`, err.message);
+        resultados.erros++;
+      }
+    }
+    
+    return resultados;
+  }
 }
 
 module.exports = new PresencaRepository();

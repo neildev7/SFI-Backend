@@ -117,7 +117,8 @@ class AlunoService {
 
     // O GATILHO DO ALERTA (Roda em background se houver amostragem suficiente)
     if (totalAulasPrevistas > 5) { 
-      alertaService.checarEGerarAlerta(id, 'GERAL', frequenciaFinal)
+      // CORREÇÃO: Usando 'null' em vez de 'GERAL' para respeitar o FK (UUID) da tabela Turma no PostgreSQL
+      alertaService.checarEGerarAlerta(id, null, frequenciaFinal)
         .catch(err => console.error("Erro ao gerar alerta de evasão:", err.message));
     }
 

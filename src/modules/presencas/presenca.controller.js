@@ -88,30 +88,25 @@ class PresencaController {
   // Sincronização em Lote (Offline Sync para o Flutter)
   async sincronizarBatch(req, res, next) {
     try {
-      const { presencas } = req.body; // O Flutter envia um array de presenças
+      const { lote } = req.body;
       
-      if (!presencas || !Array.isArray(presencas)) {
-        return res.status(400).json({ error: 'Formato inválido. Esperado um array de presencas.' });
+      // Proteção contra payload maluco
+      if (!lote || !Array.isArray(lote)) {
+        return res.status(400).json({ 
+          status: 'error', 
+          message: 'O formato do lote está incorreto. Esperava um array de presenças.' 
+        });
       }
 
-      const prisma = require('../../database/client');
+      const presencaRepository = require('./presenca.repository');
       
-      // Insere todas as presenças de uma vezada só no banco
-      const resultado = await prisma.presenca.createMany({
-        data: presencas.map(p => ({
-          alunoId: p.alunoId,
-          turmaId: p.turmaId,
-          disciplinaId: p.disciplinaId,
-          status: p.status || 'PRESENTE',
-          horarioEntrada: p.horarioEntrada ? new Date(p.horarioEntrada) : new Date(),
-          origem: 'FLUTTER_OFFLINE'
-        })),
-        skipDuplicates: true // Evita quebrar se o app mandar a mesma presença duas vezes
-      });
+      // Repassa o lote pro nosso novo método blindado!
+      const resultado = await presencaRepository.sincronizarBatchOffline(lote);
 
-      return res.status(201).json({ 
+      return res.status(200).json({ 
         status: 'success', 
-        message: `${resultado.count} presenças sincronizadas com sucesso.` 
+        message: 'Sincronização offline concluída com sucesso.',
+        resumo: resultado 
       });
     } catch (error) {
       next(error);
@@ -121,19 +116,16 @@ class PresencaController {
   // Registrar Saída (Saída Antecipada)
   async registrarSaida(req, res, next) {
     try {
-      const { id } = req.params;
-      const prisma = require('../../database/client');
+      const { id } = req.params; // ID da presença na URL
+      const { status } = req.body; // ex: 'SAIDA_ANTECIPADA' ou 'PRESENTE'
+      
+      const presencaService = require('./presenca.service');
 
-      const presencaAtualizada = await prisma.presenca.update({
-        where: { id },
-        data: {
-          horarioSaida: new Date(),
-          status: 'SAIDA_ANTECIPADA' // Atualiza o status automaticamente
-        }
-      });
+      // Delega o trabalho pesado para o Service
+      const presencaAtualizada = await presencaService.registrarSaida(id, status);
 
-      return res.status(200).json({
-        status: 'success',
+      return res.status(200).json({ 
+        status: 'success', 
         message: 'Saída registrada com sucesso.',
         data: presencaAtualizada
       });
